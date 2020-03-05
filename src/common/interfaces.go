@@ -14,8 +14,8 @@ const (
 type ValueType byte
 
 const (
-	VAL_BOOL ValueType = iota
-	VAL_NIL
+	VAL_NIL ValueType = iota
+	VAL_BOOL
 	VAL_NUMBER
 	VAL_BYTE
 	VAL_INTEGER
@@ -41,10 +41,3 @@ const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
 )
-
-type Obj interface {
-	ShowValue() string
-	Type() ValueType
-}
-
-

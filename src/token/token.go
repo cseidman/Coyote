@@ -3,11 +3,11 @@ package token
 type TokenType int
 
 type Token struct {
-	Value     []byte
-	Type      TokenType
-	Start     int
-	Length    int
-	Line      int
+	Value  []byte
+	Type   TokenType
+	Start  int
+	Length int
+	Line   int
 }
 
 func (t *Token) ToString() string {
@@ -118,111 +118,123 @@ const (
 	//90
 	TOKEN_STEP
 	TOKEN_TO
+	TOKEN_WHEN
+	TOKEN_CASE
+	TOKEN_DEFAULT
+	TOKEN_SWITCH
+	TOKEN_BREAK
+	TOKEN_CONTINUE
 )
 
 type TokenProperties struct {
-	Type TokenType
-	IsCaseSensitive bool 
+	Type            TokenType
+	IsCaseSensitive bool
 }
 
 var TokenLabels = map[string]TokenProperties{
 	"(": {TOKEN_LEFT_PAREN, true},
-	")": {TOKEN_RIGHT_PAREN,true},
-	"{": {TOKEN_LEFT_BRACE,true},
-	"}": {TOKEN_RIGHT_BRACE,true},
-	"[": {TOKEN_LEFT_BRACKET,true},
-	"]": {TOKEN_RIGHT_BRACKET,true},
-	",": {TOKEN_COMMA,true},
-	".": {TOKEN_DOT,true},
-	"-": {TOKEN_MINUS,true},
-	"+": {TOKEN_PLUS,true},
-	";": {TOKEN_SEMICOLON,true},
+	")": {TOKEN_RIGHT_PAREN, true},
+	"{": {TOKEN_LEFT_BRACE, true},
+	"}": {TOKEN_RIGHT_BRACE, true},
+	"[": {TOKEN_LEFT_BRACKET, true},
+	"]": {TOKEN_RIGHT_BRACKET, true},
+	",": {TOKEN_COMMA, true},
+	".": {TOKEN_DOT, true},
+	"-": {TOKEN_MINUS, true},
+	"+": {TOKEN_PLUS, true},
+	";": {TOKEN_SEMICOLON, true},
 	// 10
-	"/": {TOKEN_SLASH,true},
-	"*": {TOKEN_STAR,true},
-	"@": {TOKEN_AT,true},
-	"\n": {TOKEN_CR,true},
-	": {": {TOKEN_COLON,true},
-	"%": {TOKEN_PERCENT,true},
-	"~": { TOKEN_TILDE,true},
-	"?": { TOKEN_QUESTION,true},
-	"^": { TOKEN_HAT,true},
-	"$": { TOKEN_DOLLAR,true},
+	"/":   {TOKEN_SLASH, true},
+	"*":   {TOKEN_STAR, true},
+	"@":   {TOKEN_AT, true},
+	"\n":  {TOKEN_CR, true},
+	": {": {TOKEN_COLON, true},
+	"%":   {TOKEN_PERCENT, true},
+	"~":   {TOKEN_TILDE, true},
+	"?":   {TOKEN_QUESTION, true},
+	"^":   {TOKEN_HAT, true},
+	"$":   {TOKEN_DOLLAR, true},
 	// 20
-	"|": {  TOKEN_BAR,true},
-	"`": {  TOKEN_BACKTICK,true},
+	"|": {TOKEN_BAR, true},
+	"`": {TOKEN_BACKTICK, true},
 	// One or two character tokens.
-	"!": {  TOKEN_BANG,true},
-	"!=": { TOKEN_BANG_EQUAL,true},
-	"=": {  TOKEN_EQUAL,true},
-	"==": { TOKEN_EQUAL_EQUAL,true},
-	">": {  TOKEN_GREATER,true},
-	">=": { TOKEN_GREATER_EQUAL,true},
-	"<": {  TOKEN_LESS,true},
-	"<=": { TOKEN_LESS_EQUAL,true},
+	"!":  {TOKEN_BANG, true},
+	"!=": {TOKEN_BANG_EQUAL, true},
+	"=":  {TOKEN_EQUAL, true},
+	"==": {TOKEN_EQUAL_EQUAL, true},
+	">":  {TOKEN_GREATER, true},
+	">=": {TOKEN_GREATER_EQUAL, true},
+	"<":  {TOKEN_LESS, true},
+	"<=": {TOKEN_LESS_EQUAL, true},
 	// 30
-	"++": { TOKEN_PLUS_PLUS,true},
-	"--": {  TOKEN_MINUS_MINUS,true},
-	"@[": { TOKEN_LEFT_ARRAY,true},
-	"@{": { TOKEN_LEFT_LIST,true},
-	"and": {  TOKEN_AND,true},
-	"class": { TOKEN_CLASS,true},
-	"else": {    TOKEN_ELSE,true},
-	"false": {   TOKEN_FALSE,true},
-	"for": {     TOKEN_FOR,true},
-	"func": {    TOKEN_FUNC,true},
-	"select": { TOKEN_SELECT,true},
+	"++":     {TOKEN_PLUS_PLUS, true},
+	"--":     {TOKEN_MINUS_MINUS, true},
+	"@[":     {TOKEN_LEFT_ARRAY, true},
+	"@{":     {TOKEN_LEFT_LIST, true},
+	"and":    {TOKEN_AND, true},
+	"class":  {TOKEN_CLASS, true},
+	"else":   {TOKEN_ELSE, true},
+	"false":  {TOKEN_FALSE, true},
+	"for":    {TOKEN_FOR, true},
+	"func":   {TOKEN_FUNC, true},
+	"select": {TOKEN_SELECT, true},
 	//40
-	"if": {      TOKEN_IF,true},
-	"nil": {     TOKEN_NIL,true},
-	"or": {      TOKEN_OR,true},
-	"print": {   TOKEN_PRINT,true},
-	"return": {  TOKEN_RETURN,true},
-	"super": {   TOKEN_SUPER,true},
-	"this": {    TOKEN_THIS,true},
-	"true": {    TOKEN_TRUE,true},
-	"var": {     TOKEN_VAR,true},
-	"while": {   TOKEN_WHILE,true},
+	"if":     {TOKEN_IF, true},
+	"nil":    {TOKEN_NIL, true},
+	"or":     {TOKEN_OR, true},
+	"print":  {TOKEN_PRINT, true},
+	"return": {TOKEN_RETURN, true},
+	"super":  {TOKEN_SUPER, true},
+	"this":   {TOKEN_THIS, true},
+	"true":   {TOKEN_TRUE, true},
+	"var":    {TOKEN_VAR, true},
+	"while":  {TOKEN_WHILE, true},
 	// 50
-	"error": {   TOKEN_ERROR,true},
-	"include": { TOKEN_INCLUDE,true},
-	"integer": { TOKEN_TYPE_INTEGER,true},
-	"float": {   TOKEN_TYPE_FLOAT,true},
-	"bool": {    TOKEN_TYPE_BOOL,true},
-	"string": {  TOKEN_TYPE_STRING,true},
-	"array": {   TOKEN_TYPE_ARRAY,true},
-	"insert": { TOKEN_INSERT,false},
-	"update": { TOKEN_UPDATE,false},
+	"error":   {TOKEN_ERROR, true},
+	"include": {TOKEN_INCLUDE, true},
+	"integer": {TOKEN_TYPE_INTEGER, true},
+	"float":   {TOKEN_TYPE_FLOAT, true},
+	"bool":    {TOKEN_TYPE_BOOL, true},
+	"string":  {TOKEN_TYPE_STRING, true},
+	"array":   {TOKEN_TYPE_ARRAY, true},
+	"insert":  {TOKEN_INSERT, false},
+	"update":  {TOKEN_UPDATE, false},
 	// 60
-	"delete": { TOKEN_DELETE,false},
-	"from": {   TOKEN_FROM,true},
-	"join": {   TOKEN_JOIN,true},
-	"left": {   TOKEN_LEFT,true},
-	"right": {  TOKEN_RIGHT,true},
-	"crossjoin": { TOKEN_CROSSJOIN,true},
-	"where": {  TOKEN_WHERE,true},
-	"all": {    TOKEN_ALL,true},
-	"order": {  TOKEN_ORDER,true},
-	"group": {  TOKEN_GROUP,true},
-	"by": {     TOKEN_BY,true},
-	"into": {   TOKEN_INTO,true},
-	"values": { TOKEN_VALUES,true},
-	"as": {	  TOKEN_AS,true},
-	"on": {     TOKEN_ON,true},
-	"browse": { TOKEN_BROWSE,true},
+	"delete":    {TOKEN_DELETE, false},
+	"from":      {TOKEN_FROM, true},
+	"join":      {TOKEN_JOIN, true},
+	"left":      {TOKEN_LEFT, true},
+	"right":     {TOKEN_RIGHT, true},
+	"crossjoin": {TOKEN_CROSSJOIN, true},
+	"where":     {TOKEN_WHERE, true},
+	"all":       {TOKEN_ALL, true},
+	"order":     {TOKEN_ORDER, true},
+	"group":     {TOKEN_GROUP, true},
+	// 70
+	"by":     {TOKEN_BY, true},
+	"into":   {TOKEN_INTO, true},
+	"values": {TOKEN_VALUES, true},
+	"as":     {TOKEN_AS, true},
+	"on":     {TOKEN_ON, true},
+	"browse": {TOKEN_BROWSE, true},
 	// DDL statements
-	"create": { TOKEN_CREATE,true},
-	"table": {  TOKEN_TABLE,true},
-	"column": { TOKEN_COLUMN,true},
-	"row": {    TOKEN_ROW,true},
-	"view": {   TOKEN_VIEW,true},
-	"having": {   TOKEN_HAVING,true},
-	"distinct": {   TOKEN_DISTINCT,true},
-	"top": {   TOKEN_TOP,true},
+	"create":   {TOKEN_CREATE, true},
+	"table":    {TOKEN_TABLE, true},
+	"column":   {TOKEN_COLUMN, true},
+	"row":      {TOKEN_ROW, true},
+	"view":     {TOKEN_VIEW, true},
+	"having":   {TOKEN_HAVING, true},
+	"distinct": {TOKEN_DISTINCT, true},
+	"top":      {TOKEN_TOP, true},
 	//
-	"step": {   TOKEN_STEP,false},
-	"to": {   TOKEN_TO,false},
-
+	"step":     {TOKEN_STEP, false},
+	"to":       {TOKEN_TO, false},
+	"when":     {TOKEN_WHEN, false},
+	"case":     {TOKEN_CASE, false},
+	"default":  {TOKEN_DEFAULT, false},
+	"switch":   {TOKEN_SWITCH, false},
+	"break":    {TOKEN_BREAK, false},
+	"continue": {TOKEN_CONTINUE, false},
 }
 
 type Precedence byte
@@ -236,9 +248,9 @@ const (
 	PREC_COMPARISON            // < > <= >=
 	PREC_TERM                  // + -
 	PREC_INCR
-	PREC_FACTOR                // * /
-	PREC_UNARY                 // ! -
-	PREC_CALL                  // . ()
+	PREC_FACTOR // * /
+	PREC_UNARY  // ! -
+	PREC_CALL   // . ()
 	PREC_INDEX
 	PREC_ARRAY // . @[]
 	PREC_LIST  //. 	@{}

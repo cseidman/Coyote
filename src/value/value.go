@@ -7,18 +7,24 @@ import (
 	"hash/fnv"
 )
 
+type Obj interface {
+	ShowValue() string
+	Type() ValueType
+	ToBytes() []byte
+}
+
 // Internal types
 type ObjColumnDef struct {
-	TableName string
+	TableName  string
 	ColumnName string
-	Alias string
-	Ordinal byte
+	Alias      string
+	Ordinal    byte
 }
 
 // Interface types
 func (c *ObjColumnDef) ShowValue() string { return fmt.Sprintf("%s", c.ColumnName) }
 func (c *ObjColumnDef) Type() ValueType   { return VAL_COLUMN_DEF }
-func (c *ObjColumnDef) Add(col *ObjColumnDef) *ObjColumnDef {return nil}
+func (c *ObjColumnDef) ToBytes() []byte   { return nil }
 
 // User types
 type ObjInteger struct{ Value int64 }
@@ -75,7 +81,7 @@ type ObjList struct {
 }
 
 type ObjClass struct {
-	Name string
+	Name    string
 	Methods map[string]Obj
 }
 
@@ -94,7 +100,7 @@ func NewClass(className string) *ObjClass {
 
 func (c *ObjClass) ShowValue() string { return fmt.Sprintf("%s", c.Name) }
 func (c *ObjClass) Type() ValueType   { return VAL_CLASS }
-func (c *ObjClass) Add(*ObjClass) *ObjClass {return nil}
+func (c *ObjClass) ToBytes() []byte   { return nil }
 
 // Class instance functions
 func NewInstance(class *ObjClass) *ObjInstance {
@@ -106,7 +112,7 @@ func NewInstance(class *ObjClass) *ObjInstance {
 
 func (i *ObjInstance) ShowValue() string { return fmt.Sprintf("Instance of %s", i.Class.Name) }
 func (i *ObjInstance) Type() ValueType   { return VAL_INSTANCE }
-func (i *ObjInstance) Add(*ObjInstance) *ObjInstance {return nil}
+func (i *ObjInstance) ToBytes() []byte   { return nil }
 
 func (i *ObjInstance) GetFieldValue(fieldName string) *Obj {
 	if val, ok := i.Fields[fieldName]; ok {
@@ -136,7 +142,7 @@ func (l *ObjList) ShowValue() string {
 	return fmt.Sprintf("%s", "List")
 }
 func (l *ObjList) Type() ValueType { return VAL_LIST }
-func (l *ObjList) Add(*ObjList) *ObjList {return nil}
+func (l *ObjList) ToBytes() []byte { return nil }
 
 func (l *ObjList) Init(keyType ValueType, elementCount int) {
 	l.ElementCount = elementCount
@@ -157,7 +163,7 @@ func (u *ObjUpvalue) ShowValue() string {
 	return fmt.Sprintf("%s", "Upvalue")
 }
 func (u *ObjUpvalue) Type() ValueType { return VAL_UPVALUE }
-func (u *ObjUpvalue) Add() *ObjUpvalue {return nil}
+func (u *ObjUpvalue) ToBytes() []byte { return nil }
 
 func NewUpvalue(slot *Obj) *ObjUpvalue {
 	upvalue := new(ObjUpvalue)
@@ -174,6 +180,7 @@ func NewUpvalue(slot *Obj) *ObjUpvalue {
 // Closure functions
 func (c *ObjClosure) ShowValue() string { return fmt.Sprintf("%s", c.Function.Name) }
 func (c *ObjClosure) Type() ValueType   { return VAL_CLOSURE }
+func (c *ObjClosure) ToBytes() []byte   { return nil }
 
 func NewClosure(function *ObjFunction) *ObjClosure {
 	// Make an array of upvalues of the same size as the number of
@@ -200,6 +207,8 @@ func NewClosure(function *ObjFunction) *ObjClosure {
 // Function functions
 func (f *ObjFunction) ShowValue() string { return fmt.Sprintf("%s", f.Name) }
 func (f *ObjFunction) Type() ValueType   { return VAL_FUNCTION }
+func (f *ObjFunction) ToBytes() []byte   { return nil }
+
 /*
 func NewFunction() *ObjFunction {
 
@@ -222,6 +231,7 @@ func NewFunction() *ObjFunction {
 // Native functions
 func (n *ObjNative) ShowValue() string { return fmt.Sprintf("%s", "<native fn>") }
 func (n *ObjNative) Type() ValueType   { return VAL_NATIVE }
+func (n *ObjNative) ToBytes() []byte   { return nil }
 
 func NewNative(function NativeFn) *ObjNative {
 	native := new(ObjNative)
@@ -232,23 +242,25 @@ func NewNative(function NativeFn) *ObjNative {
 // NULL functions
 func (n *NULL) ShowValue() string { return fmt.Sprintf("%s", "null") }
 func (n *NULL) Type() ValueType   { return VAL_NIL }
+func (n *NULL) ToBytes() []byte   { return nil }
 
 // Integer functions
 func (i *ObjInteger) ShowValue() string { return fmt.Sprintf("%d", i.Value) }
 func (i *ObjInteger) Type() ValueType   { return VAL_INTEGER }
+func (i *ObjInteger) ToBytes() []byte   { return Int64ToBytes(i.Value) }
+
 func (i *ObjInteger) HashValue() HashKey {
 	return HashKey{
 		Type:      VAL_INTEGER,
 		HashValue: uint64(i.Value),
 	}
 }
-func (i *ObjInteger) Add(oInt *ObjInteger) *ObjInteger {
-	return &ObjInteger{i.Value + oInt.Value}
-}
 
 // Float functions
 func (f *ObjFloat) ShowValue() string { return fmt.Sprintf("%f", f.Value) }
 func (f *ObjFloat) Type() ValueType   { return VAL_FLOAT }
+func (f *ObjFloat) ToBytes() []byte   { return Float64ToBytes(f.Value) }
+
 func (f *ObjFloat) HashValue() HashKey {
 	return HashKey{
 		Type:      VAL_FLOAT,
@@ -262,7 +274,7 @@ func (f *ObjFloat) Add(oFloat *ObjFloat) *ObjFloat {
 // String functions
 func (s *ObjString) ShowValue() string { return fmt.Sprintf("%s", s.Value) }
 func (s *ObjString) Type() ValueType   { return VAL_STRING }
-func (s *ObjString) Add(*ObjString) *ObjString   { return nil }
+func (s *ObjString) ToBytes() []byte   { return []byte(s.Value) }
 
 func (s *ObjString) HashValue() HashKey {
 	bw := fnv.New64a()
@@ -276,7 +288,7 @@ func (s *ObjString) HashValue() HashKey {
 // Byte functions
 func (b *ObjByte) ShowValue() string { return fmt.Sprintf("%d", b.Value) }
 func (b *ObjByte) Type() ValueType   { return VAL_BYTE }
-func (b *ObjByte) Add(bval *ObjByte) *ObjByte {return &ObjByte{b.Value + bval.Value} }
+func (b *ObjByte) ToBytes() []byte   { return []byte{b.Value} }
 
 // Bool functions
 func (b *ObjBool) ShowValue() string {
@@ -287,7 +299,7 @@ func (b *ObjBool) ShowValue() string {
 	}
 }
 func (b *ObjBool) Type() ValueType { return VAL_BOOL }
-func (b *ObjBool) Add(btype *ObjBool) *ObjBool {return &ObjBool{b.Value && btype.Value}}
+func (b *ObjBool) ToBytes() []byte { return BoolToBytes(b.Value) }
 
 func (b *ObjBool) HashValue() HashKey {
 	var val uint64
@@ -312,7 +324,7 @@ func (a *ObjArray) ShowValue() string {
 	return strVal
 }
 func (a *ObjArray) Type() ValueType { return VAL_ARRAY }
-func (a *ObjArray) Add(*ObjArray) *ObjArray {return nil}
+func (a *ObjArray) ToBytes() []byte { return nil }
 
 func (a *ObjArray) Init(v ValueType, e int) {
 	a.ElementCount = e
@@ -324,7 +336,7 @@ func (a *ObjArray) GetElement(element int64) Obj {
 }
 
 // Utility functions
-func MakeStringObj(str string)*ObjString {
+func MakeStringObj(str string) *ObjString {
 	obj := new(ObjString)
 	obj.Value = str
 	return obj

@@ -1,7 +1,9 @@
-for i = 0 to 3 step 1 {
-  print i
-  for j = 0 to 3 step 1 {
-    print j+100
-  }
+var i = 0
+while i < 3 {
+    var j = 10
+    while j < 14 {
+        print j
+        j=j+1
+    }
+    i=i+1
 }
-print 100
