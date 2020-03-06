@@ -78,6 +78,8 @@ func (v *VM) ForLoop(fromReg int, bytes int) {
 	v.Registers[fromReg] = v.Pop().(*ObjInteger).Value
 
 	startIp := v.ip
+
+mainLoop:
 	for i := v.Registers[fromReg]; i <= to; i += step {
 		v.Registers[fromReg] = i
 		for {
@@ -85,12 +87,18 @@ func (v *VM) ForLoop(fromReg int, bytes int) {
 			if (v.ip - startIp) > bytes {
 				break
 			}
-			v.Dispatch()
 			i = v.Registers[fromReg]
+			if v.ByteCode[v.ip] == OP_BREAK {
+				break mainLoop
+			} else if v.ByteCode[v.ip] == OP_CONTINUE {
+				v.ip = startIp
+				continue mainLoop
+			}
+			v.Dispatch()
 		}
 		v.ip = startIp
 	}
-	v.ip += bytes
+	v.ip = startIp + bytes
 }
 
 func (v *VM) Dispatch() {
@@ -194,7 +202,7 @@ func (v *VM) Dispatch() {
 		if val.(*ObjBool).Value == false {
 			v.ip += int(jmpIndex)
 		}
-
+	case OP_BREAK:
 	case OP_JUMP:
 		v.ip += int(v.GetOperandValue())
 	case OP_FOR_LOOP:

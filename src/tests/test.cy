@@ -1,9 +1,13 @@
-var i = 0
-while i < 3 {
-    var j = 10
-    while j < 14 {
-        print j
-        j=j+1
+for i  = 1 to 10 {
+    if i < 3 {
+        print "CONTINUE"
+        continue
     }
-    i=i+1
+
+    if i==4 {
+        print "BREAK"
+        break
+    }
+    print i
 }
+print "Done!"

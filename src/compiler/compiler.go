@@ -23,6 +23,29 @@ var BreakPtr int
 var StartLoop = make([]int, 255)
 var StartPtr int
 
+// Keep track of loop types currently in play
+const (
+	LOOP_WHILE byte = iota
+	LOOP_FOR
+)
+
+var LoopType = make([]byte, 255)
+var LoopPtr int
+
+func PushLoop(loopType byte) {
+	LoopType[LoopPtr] = loopType
+	LoopPtr++
+}
+
+func PopLoop() byte {
+	LoopPtr--
+	return LoopType[LoopPtr]
+}
+
+func PeekLoop() byte {
+	return LoopType[LoopPtr-1]
+}
+
 // This is the global variable space
 type Global struct {
 	name     Token
@@ -681,24 +704,30 @@ func (c *Compiler) PatchBreaks() {
 }
 
 func (c *Compiler) BreakStatement() {
-	Breaks[BreakPtr].StartLoc = c.EmitJump(OP_JUMP)
-	Breaks[BreakPtr].CanPatch = true
-	BreakPtr++
+	if PeekLoop() == LOOP_WHILE {
+		Breaks[BreakPtr].StartLoc = c.EmitJump(OP_JUMP)
+		Breaks[BreakPtr].CanPatch = true
+		BreakPtr++
+	} else if PeekLoop() == LOOP_FOR {
+		c.EmitOp(OP_BREAK)
+	}
 }
 
 func (c *Compiler) ContinueStatement() {
-	curLoc := c.CurrentInstructions.NextBytePosition() + 3
-	start := StartLoop[StartPtr]
-	offSet := start - curLoc
-	c.EmitInstr(OP_JUMP, int16(offSet))
-	c.WriteComment(fmt.Sprintf("Continue to %d from %d by offset %d", start, curLoc, offSet))
+	if PeekLoop() == LOOP_WHILE {
+		curLoc := c.CurrentInstructions.NextBytePosition() + 3
+		start := StartLoop[StartPtr]
+		offSet := start - curLoc
+		c.EmitInstr(OP_JUMP, int16(offSet))
+		c.WriteComment(fmt.Sprintf("Continue to %d from %d by offset %d", start, curLoc, offSet))
+	} else if PeekLoop() == LOOP_FOR {
+		c.EmitOp(OP_CONTINUE)
+	}
 }
 
 func (c *Compiler) IfStatement() {
 	// This part handles the logical 'if' condition
-	//c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'")
 	c.Expression()
-	//c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' to close 'if' condition")
 
 	thenJump := c.EmitJump(OP_JUMP_IF_FALSE)
 	c.Statement()
@@ -719,6 +748,7 @@ func (c *Compiler) EmitLoop(offset int) {
 }
 
 func (c *Compiler) ForStatement() {
+	PushLoop(LOOP_FOR)
 	c.BeginScope()
 
 	/*
@@ -774,9 +804,12 @@ func (c *Compiler) ForStatement() {
 	delete(namedRegisters, varName)
 
 	c.EndScope()
+	PopLoop()
 }
 
 func (c *Compiler) WhileStatement() {
+
+	PushLoop(LOOP_WHILE)
 
 	start := c.CurrentInstructions.NextBytePosition()
 	StartPtr++
@@ -797,7 +830,7 @@ func (c *Compiler) WhileStatement() {
 	c.PatchBreaks()
 
 	StartPtr--
-
+	PopLoop()
 }
 
 func (c *Compiler) SwitchStatement() {
