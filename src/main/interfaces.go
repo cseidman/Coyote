@@ -1,4 +1,4 @@
-package common
+package main
 
 type VarType byte
 

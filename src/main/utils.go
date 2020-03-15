@@ -1,7 +1,6 @@
-package common
+package main
 
 import (
-	. "../parser"
 	"fmt"
 	"io/ioutil"
 )

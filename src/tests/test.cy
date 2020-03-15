@@ -1,13 +1,14 @@
-for i  = 1 to 10 {
-    if i < 3 {
-        print "CONTINUE"
-        continue
+var recurse_fibonacci = function(n:int) int {
+    if n <= 1 {
+        return n
+    } else {
+        return recurse_fibonacci(n-1) + recurse_fibonacci(n-2)
     }
-
-    if i==4 {
-        print "BREAK"
-        break
-    }
-    print i
 }
-print "Done!"
+for i = 0 to 34 {
+//var i = 0
+//while i<= 34 {
+    print recurse_fibonacci(i)
+   // i = i+1
+}
+

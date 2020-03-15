@@ -1,8 +1,6 @@
-package value
+package main
 
 import (
-	. "../chunk"
-	. "../common"
 	"fmt"
 	"hash/fnv"
 )
@@ -42,9 +40,8 @@ type ObjArray struct {
 var FunctionId int
 
 type ObjFunction struct {
-	Arity        int
-	FChunk       Chunk
-	Name         string
+	Arity        int16
+	Code         *Chunk
 	UpvalueCount int
 	FuncType     FunctionType
 	Id           int
@@ -178,7 +175,7 @@ func NewUpvalue(slot *Obj) *ObjUpvalue {
 }
 
 // Closure functions
-func (c *ObjClosure) ShowValue() string { return fmt.Sprintf("%s", c.Function.Name) }
+func (c *ObjClosure) ShowValue() string { return fmt.Sprintf("%s", "<fn>") }
 func (c *ObjClosure) Type() ValueType   { return VAL_CLOSURE }
 func (c *ObjClosure) ToBytes() []byte   { return nil }
 
@@ -205,20 +202,19 @@ func NewClosure(function *ObjFunction) *ObjClosure {
 }
 
 // Function functions
-func (f *ObjFunction) ShowValue() string { return fmt.Sprintf("%s", f.Name) }
-func (f *ObjFunction) Type() ValueType   { return VAL_FUNCTION }
-func (f *ObjFunction) ToBytes() []byte   { return nil }
+func (f *ObjFunction) ShowValue() string {
+	return fmt.Sprintf("%s", "<fn>")
+}
+func (f *ObjFunction) Type() ValueType { return VAL_FUNCTION }
+func (f *ObjFunction) ToBytes() []byte { return nil }
 
-/*
-func NewFunction() *ObjFunction {
+func NewFunction() ObjFunction {
 
-	chunk := New
-	InitChunk(chunk)
+	code := NewChunk()
 
-	function := &ObjFunction{
+	function := ObjFunction{
 		Arity:        0,
-		Name:         "",
-		FChunk:       *chunk,
+		Code:         &code,
 		UpvalueCount: 0,
 		Id:           FunctionId,
 	}
@@ -227,11 +223,13 @@ func NewFunction() *ObjFunction {
 
 	return function
 }
-*/
+
 // Native functions
-func (n *ObjNative) ShowValue() string { return fmt.Sprintf("%s", "<native fn>") }
-func (n *ObjNative) Type() ValueType   { return VAL_NATIVE }
-func (n *ObjNative) ToBytes() []byte   { return nil }
+func (n *ObjNative) ShowValue() string {
+	return fmt.Sprintf("%s", "<native fn>")
+}
+func (n *ObjNative) Type() ValueType { return VAL_NATIVE }
+func (n *ObjNative) ToBytes() []byte { return nil }
 
 func NewNative(function NativeFn) *ObjNative {
 	native := new(ObjNative)

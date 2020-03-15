@@ -1,7 +1,6 @@
-package scanner
+package main
 
 import (
-	. "../token"
 	"log"
 	"strings"
 )
@@ -9,25 +8,25 @@ import (
 var NULLCHAR = []byte("\000")[0]
 
 type Scanner struct {
-	Code     []byte
-	Current  int
-	Start int
-	Line     int
+	Code        []byte
+	Current     int
+	Start       int
+	Line        int
 	SkipCRDepth int
-	SkipCRMode []bool
-	ScanDepth int
+	SkipCRMode  []bool
+	ScanDepth   int
 }
 
 func NewScanner(source *string) Scanner {
 
-	return Scanner {
-		Code: []byte(*source),
+	return Scanner{
+		Code:    []byte(*source),
 		Current: 0,
-		Start: 0,
-		Line: 1,
+		Start:   0,
+		Line:    0,
 
 		SkipCRDepth: 0,
-		SkipCRMode: make([]bool,256),
+		SkipCRMode:  make([]bool, 256),
 
 		ScanDepth: 0,
 	}
@@ -146,7 +145,7 @@ func (s *Scanner) PushCRMode(CRMode bool) {
 	s.SkipCRMode[s.SkipCRDepth] = CRMode
 }
 
-func (s *Scanner) PopCRMode()  {
+func (s *Scanner) PopCRMode() {
 	s.SkipCRDepth--
 }
 

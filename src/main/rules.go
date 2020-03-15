@@ -1,8 +1,4 @@
-package compiler
-
-import (
-	. "../token"
-)
+package main
 
 type ParseFn func(bool)
 type ParseRule struct {
@@ -14,7 +10,7 @@ type ParseRule struct {
 
 func (c *Compiler) LoadRules() {
 	c.Rules = []ParseRule{
-		{c.Grouping, c.Call, nil, PREC_NONE}, // TOKEN_LEFT_PAREN
+		{c.Grouping, c.Call, nil, PREC_CALL}, // TOKEN_LEFT_PAREN
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_PAREN
 		{nil, nil, nil, PREC_NONE},           // TOKEN_LEFT_BRACE
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACE
@@ -59,16 +55,16 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},           // TOKEN_HMAP
 		{nil, c.and_, nil, PREC_AND},         // TOKEN_AND
 		// 40
-		{nil, nil, nil, PREC_NONE},       // TOKEN_CLASS
-		{nil, nil, nil, PREC_NONE},       // TOKEN_ELSE
-		{c.Literal, nil, nil, PREC_NONE}, // TOKEN_FALSE
-		{nil, nil, nil, PREC_NONE},       // TOKEN_FOR
-		{nil, nil, nil, PREC_NONE},       // TOKEN_FUNC
-		{nil, nil, nil, PREC_NONE},       // TOKEN_IF
-		{c.Literal, nil, nil, PREC_NONE}, // TOKEN_NIL
-		{nil, c.or_, nil, PREC_OR},       // TOKEN_OR
-		{nil, nil, nil, PREC_NONE},       // TOKEN_PRINT
-		{nil, nil, nil, PREC_NONE},       // TOKEN_RETURN
+		{nil, nil, nil, PREC_NONE},        // TOKEN_CLASS
+		{nil, nil, nil, PREC_NONE},        // TOKEN_ELSE
+		{c.Literal, nil, nil, PREC_NONE},  // TOKEN_FALSE
+		{nil, nil, nil, PREC_NONE},        // TOKEN_FOR
+		{c.Function, nil, nil, PREC_NONE}, // TOKEN_FUNC
+		{nil, nil, nil, PREC_NONE},        // TOKEN_IF
+		{c.Literal, nil, nil, PREC_NONE},  // TOKEN_NIL
+		{nil, c.or_, nil, PREC_OR},        // TOKEN_OR
+		{nil, nil, nil, PREC_NONE},        // TOKEN_PRINT
+		{nil, nil, nil, PREC_NONE},        // TOKEN_RETURN
 		// 50
 		{nil, nil, nil, PREC_NONE},       // TOKEN_SUPER
 		{nil, nil, nil, PREC_NONE},       // TOKEN_THIS

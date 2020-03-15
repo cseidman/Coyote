@@ -1,13 +1,10 @@
 package main
 
 import (
-	."../common"
-	."../compiler"
-	."../vm"
 	"flag"
 	"fmt"
-	//"os"
 	"runtime/debug"
+	"time"
 )
 
 func main() {
@@ -23,13 +20,15 @@ func main() {
 
 	debug.SetGCPercent(-1)
 
-	// Load Globals slot
-	LoadGlobals()
-
 	if SrcFile == "" {
 		repl()
 	} else {
+		start := time.Now()
 		RunFile(SrcFile)
+		t := time.Now()
+		elapsed := t.Sub(start)
+		fmt.Printf("\nElapsed: %v\n", elapsed.String())
+
 	}
 
 }
@@ -56,15 +55,13 @@ func RunFile(path string) {
 
 	source := ReadFile(path) + "\n"
 	Exec(&source)
-/*
-	if result == INTERPRET_COMPILE_ERROR {
-		os.Exit(65)
-	}
-	if result == INTERPRET_RUNTIME_ERROR {
-		os.Exit(70)
-	}
-*/
+	/*
+		if result == INTERPRET_COMPILE_ERROR {
+			os.Exit(65)
+		}
+		if result == INTERPRET_RUNTIME_ERROR {
+			os.Exit(70)
+		}
+	*/
 
 }
-
-

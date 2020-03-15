@@ -1,11 +1,6 @@
-package compiler
+package main
 
 import (
-	. "../common"
-	. "../instructions"
-	. "../parser"
-	. "../token"
-	. "../value"
 	"bytes"
 	"fmt"
 	"strconv"
@@ -46,19 +41,32 @@ func PeekLoop() byte {
 	return LoopType[LoopPtr-1]
 }
 
+// Global function namespace
+type FunctionVar struct {
+	paramCount int16
+	returnType ValueType
+	instr      Instructions
+}
+
+func (f *FunctionVar) ConvertToObj() *ObjFunction {
+	FunctionId++
+	return &ObjFunction{
+		Arity:        f.paramCount,
+		Code:         f.instr.ToChunk(),
+		UpvalueCount: 0,
+		FuncType:     TYPE_FUNCTION,
+		Id:           FunctionId,
+	}
+}
+
 // This is the global variable space
 type Global struct {
 	name     Token
 	datatype ValueType
 }
 
-var GlobalVars []Global
-var GlobalCount int16
-
-func LoadGlobals() {
-	GlobalVars = make([]Global, 65000)
-	GlobalCount = 0
-}
+var GlobalVars = make([]Global, 65000)
+var GlobalCount = int16(0)
 
 func AddGlobal(tok Token) int16 {
 
@@ -88,62 +96,102 @@ type register struct {
 	isUsed bool
 }
 
+var registers = make([]register, 256)
+
 type Compiler struct {
-	Parser              *Parser
-	CurrentInstructions *Instructions
-	Rules               []ParseRule
+	Instr      []Instructions
+	InstrCount int
+
+	Parser *Parser
+	Rules  []ParseRule
 
 	locals     []Local
 	LocalCount int16
 
 	registers []register
 
-	Upvalues []Upvalue
-
 	ScopeDepth int
 }
 
-func Compile(source *string) Instructions {
+func Compile(source *string) *ObjFunction {
 
 	// First parse the source
 	parser := NewParser(source)
-	instr := NewInstructions()
-	compiler := Compiler{
-		Parser:              &parser,
-		CurrentInstructions: &instr,
-		LocalCount:          0,
-		ScopeDepth:          0,
-		locals:              make([]Local, 16000),
-		Upvalues:            make([]Upvalue, 16000),
-		registers:           make([]register, 256),
-	}
 
-	compiler.LocalCount++
-	compiler.locals[compiler.LocalCount].depth = 0
-	compiler.locals[compiler.LocalCount].isCaptured = false
-	compiler.locals[compiler.LocalCount].name.Length = 0
-	compiler.locals[compiler.LocalCount].name.Value = []byte(nil)
+	compiler := NewCompiler(&parser)
 
-	compiler.LoadRules()
 	compiler.Advance()
 	for !compiler.Match(TOKEN_EOF) {
 		compiler.Evaluate()
 	}
-	compiler.ReturnStatement()
 
-	instr.Display()
+	compiler.EmitOp(OP_HALT)
+	fmt.Println("=== Instructions ===")
+	compiler.CurrentInstructions().Display()
 
-	return instr
+	fn := &ObjFunction{
+		Arity:        0,
+		Code:         compiler.CurrentInstructions().ToChunk(),
+		UpvalueCount: 0,
+		FuncType:     TYPE_SCRIPT,
+		Id:           0,
+	}
+
+	return fn
+}
+
+/* -------------------------------------------------------
+Creates and initializes a app ready for use
+ ------------------------------------------------------- */
+func NewCompiler(parser *Parser) *Compiler {
+	var compiler Compiler
+	compiler.Parser = parser
+
+	compiler.Init()
+
+	compiler.LoadRules()
+	return &compiler
+}
+
+func (c *Compiler) Init() {
+
+	c.Instr = make([]Instructions, 256)
+
+	c.PushInstruction()
+
+	c.LocalCount = 0
+	c.ScopeDepth = 0
+	c.locals = make([]Local, 65000)
+
+	c.LocalCount++
+	c.locals[c.LocalCount].depth = 0
+	c.locals[c.LocalCount].isCaptured = false
+	c.locals[c.LocalCount].name.Length = 0
+	c.locals[c.LocalCount].name.Value = []byte(nil)
+}
+
+func (c *Compiler) PushInstruction() {
+	c.Instr[c.InstrCount] = NewInstructions()
+	c.InstrCount++
+}
+
+func (c *Compiler) PopInstruction() *Instructions {
+	c.InstrCount--
+	return &c.Instr[c.InstrCount]
+}
+
+func (c *Compiler) CurrentInstructions() *Instructions {
+	return &c.Instr[c.InstrCount-1]
 }
 
 func (c *Compiler) FreeRegister(location int16) {
-	c.registers[location].isUsed = false
+	registers[location].isUsed = false
 }
 
 func (c *Compiler) GetFreeRegister() int16 {
 	for i := int16(0); i < 256; i++ {
-		if !c.registers[i].isUsed {
-			c.registers[i] = register{
+		if !registers[i].isUsed {
+			registers[i] = register{
 				isUsed: true,
 			}
 			return i
@@ -158,11 +206,11 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 	// strings and save some space
 	if value.Type() == VAL_STRING {
 		var i int16
-		for i = 0; i < c.CurrentInstructions.ConstantsCount; i++ {
+		for i = 0; i < c.CurrentInstructions().ConstantsCount; i++ {
 			// it's a string
-			if c.CurrentInstructions.Constants[i].Type() == VAL_STRING {
+			if c.CurrentInstructions().Constants[i].Type() == VAL_STRING {
 				// If the strings match
-				if c.CurrentInstructions.Constants[i].(*ObjString).Value == value.(*ObjString).Value {
+				if c.CurrentInstructions().Constants[i].(*ObjString).Value == value.(*ObjString).Value {
 					return i
 				}
 			}
@@ -179,9 +227,9 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 }
 
 func (c *Compiler) AddConstant(val Obj) int16 {
-	c.CurrentInstructions.Constants[c.CurrentInstructions.ConstantsCount] = val
-	c.CurrentInstructions.ConstantsCount++
-	return c.CurrentInstructions.ConstantsCount - 1
+	c.CurrentInstructions().Constants[c.CurrentInstructions().ConstantsCount] = val
+	c.CurrentInstructions().ConstantsCount++
+	return c.CurrentInstructions().ConstantsCount - 1
 }
 
 func (c *Compiler) Advance() {
@@ -236,6 +284,8 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	var setOp byte
 	var valType ValueType
 
+	//fmt.Printf("Var name: %s at line %d\n",tok.ToString(),c.Parser.Current.Line)
+
 	// If it's a local variable, we look for that before globals
 	idx := c.ResolveLocal(&tok)
 	// -1 means it wasn't found
@@ -262,7 +312,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	if canAssign && c.Match(TOKEN_EQUAL) {
 		c.Expression()
 		c.EmitInstr(setOp, idx)
-		valType = c.CurrentInstructions.GetType(0)
+		valType = c.CurrentInstructions().GetType(0)
 		if setOp == OP_SET_GLOBAL {
 			GlobalVars[idx].datatype = valType
 		} else if setOp == OP_SET_LOCAL {
@@ -284,6 +334,49 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 func (c *Compiler) IdentifierConstant() int16 {
 	return c.MakeConstant(&ObjString{Value: string(c.Parser.Previous.Value)})
+}
+
+func (c *Compiler) DefineParameter() {
+	c.Consume(TOKEN_IDENTIFIER, "Expect parameter name")
+	// Store the token here
+	tok := c.Parser.Previous
+	var valType ValueType
+
+	c.Consume(TOKEN_COLON, "Expect ':' with type after parameter")
+	valType = c.GetDataType()
+	if valType == VAL_NIL {
+		c.ErrorAtCurrent("Invalid data type")
+	}
+
+	var index int16
+
+	for i := c.LocalCount - 1; i >= 0; i-- {
+		if c.locals[i].depth != -1 &&
+			c.locals[i].depth < c.ScopeDepth {
+			break
+		}
+
+		if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) {
+			c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
+		}
+	}
+
+	index = c.AddLocal(tok)
+	c.locals[index].dataType = valType
+
+}
+
+func (c *Compiler) GetDataType() ValueType {
+
+	if c.Match(TOKEN_TYPE_INTEGER) {
+		return VAL_INTEGER
+	} else if c.Match(TOKEN_TYPE_FLOAT) {
+		return VAL_FLOAT
+	} else if c.Match(TOKEN_TYPE_STRING) {
+		return VAL_STRING
+	}
+	return VAL_NIL
+
 }
 
 func (c *Compiler) DeclareVariable() {
@@ -322,7 +415,7 @@ func (c *Compiler) DeclareVariable() {
 	// on the stack as well
 	if c.Match(TOKEN_EQUAL) {
 		c.Expression()
-		valType = c.CurrentInstructions.GetType(0)
+		valType = c.CurrentInstructions().GetType(0)
 
 	} else {
 		c.EmitOp(OP_NIL)
@@ -395,7 +488,7 @@ func (c *Compiler) ErrorAt(token *Token, message string) {
 	if c.Parser.PanicMode {
 		return
 	}
-	// This tells the compiler that we're in error mode now,
+	// This tells the app that we're in error mode now,
 	// but we keep evaluating code without actually generating byte code
 	c.Parser.PanicMode = true
 
@@ -422,19 +515,41 @@ func (c *Compiler) Error(message string) {
 }
 
 func (c *Compiler) SetType(valueType ValueType) {
-	c.CurrentInstructions.AddType(valueType)
+	c.CurrentInstructions().AddType(valueType)
 }
 
 func (c *Compiler) EmitOp(opcode byte) {
-	c.CurrentInstructions.WriteSimpleInstruction(opcode)
+	c.CurrentInstructions().WriteSimpleInstruction(opcode, c.Parser.Previous.Line)
+}
+
+func (c *Compiler) EmitPushInteger(val int16) {
+	switch val {
+	case 0:
+		c.EmitOp(OP_PUSH_0)
+	case 1:
+		c.EmitOp(OP_PUSH_1)
+	default:
+		c.EmitInstr(OP_PUSH, val)
+	}
 }
 
 func (c *Compiler) EmitInstr(opcode byte, operand int16) {
-	c.CurrentInstructions.WriteInstruction(opcode, operand)
+	c.CurrentInstructions().WriteInstruction(opcode, operand, c.Parser.Previous.Line)
+}
+
+func (c *Compiler) EmitReturn() {
+	c.EmitOp(OP_NIL)
+	c.EmitOp(OP_RETURN)
 }
 
 func (c *Compiler) ReturnStatement() {
-	c.EmitOp(OP_RETURN)
+	if c.Match(TOKEN_CR) {
+		c.EmitReturn()
+	} else {
+		c.Expression()
+		c.Consume(TOKEN_CR, "Expect CR after return value")
+		c.EmitOp(OP_RETURN)
+	}
 }
 
 func (c *Compiler) ParsePrecedence(precedence Precedence) {
@@ -478,7 +593,33 @@ func (c *Compiler) Grouping(canAssign bool) {
 	c.Expression()
 	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression")
 }
-func (c *Compiler) Call(canAssign bool) {}
+func (c *Compiler) Call(canAssign bool) {
+
+	argumentCount := c.GetArguments()
+	c.EmitInstr(OP_CALL, argumentCount)
+	c.WriteComment(fmt.Sprintf("Function call with %d arguments", argumentCount))
+}
+
+func (c *Compiler) GetArguments() int16 {
+	argCount := int16(0)
+	if !c.Check(TOKEN_RIGHT_PAREN) {
+		for {
+			c.Expression()
+			if argCount == 255 {
+				c.Error("Cannot have more than 255 arguments.")
+			}
+			argCount++
+
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+	}
+
+	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.")
+	return argCount
+}
+
 func (c *Compiler) Postary(canAssign bool) {
 	operatorType := c.Parser.Previous.Type
 	// Emit the operator instruction.
@@ -519,13 +660,13 @@ func (c *Compiler) Binary(canAssign bool) {
 	rprec := rule.Prec + 1
 	c.ParsePrecedence(rprec)
 
-	ltype := c.CurrentInstructions.GetType(1)
-	rtype := c.CurrentInstructions.GetType(0)
+	ltype := c.CurrentInstructions().GetType(1)
+	//rtype := c.CurrentInstructions().GetType(0)
 
-	if ltype != rtype {
-		c.ErrorAtCurrent("Types don't match")
-		return
-	}
+	//if ltype != rtype {
+	//	c.ErrorAtCurrent("Types don't match")
+	//	return
+	//}
 	// This is the value for both types
 	dType := ltype
 
@@ -557,7 +698,9 @@ func (c *Compiler) Binary(canAssign bool) {
 			c.EmitOp(OP_FADD)
 			c.SetType(VAL_FLOAT)
 		} else {
-			fmt.Printf("Error in the data types %d:%d\n", ltype, rtype)
+			c.EmitOp(OP_IADD)
+			c.SetType(VAL_INTEGER)
+			//fmt.Printf("Error in the data types %d:%d\n", ltype, rtype)
 		}
 	case TOKEN_MINUS:
 		if dType == VAL_INTEGER {
@@ -667,7 +810,7 @@ func (c *Compiler) EndScope() {
 			c.EmitOp(OP_CLOSE_UPVALUE)
 		} else {
 			c.EmitOp(OP_POP)
-			//c.WriteComment(currentChunk(), "POP after end of scope")
+			c.WriteComment("POP after end of scope")
 		}
 		c.LocalCount--
 	}
@@ -675,18 +818,18 @@ func (c *Compiler) EndScope() {
 
 func (c *Compiler) EmitJump(opcode byte) int {
 	c.EmitInstr(opcode, int16(9999))
-	curPos := c.CurrentInstructions.CurrentBytePosition()
+	curPos := c.CurrentInstructions().CurrentBytePosition()
 	c.WriteComment(fmt.Sprintf("Jump from %d", curPos))
-	return c.CurrentInstructions.Count - 1
+	return c.CurrentInstructions().Count - 1
 }
 
 func (c *Compiler) PatchJump(instrNumber int) {
 
-	jump := c.CurrentInstructions.JumpFrom(instrNumber)
-	currentLocation := c.CurrentInstructions.NextBytePosition()
+	jump := c.CurrentInstructions().JumpFrom(instrNumber)
+	currentLocation := c.CurrentInstructions().NextBytePosition()
 	byteJump := currentLocation - jump
 
-	c.CurrentInstructions.SetOperand(instrNumber, int16(byteJump))
+	c.CurrentInstructions().SetOperand(instrNumber, int16(byteJump))
 }
 
 func (c *Compiler) PatchBreaks() {
@@ -715,7 +858,7 @@ func (c *Compiler) BreakStatement() {
 
 func (c *Compiler) ContinueStatement() {
 	if PeekLoop() == LOOP_WHILE {
-		curLoc := c.CurrentInstructions.NextBytePosition() + 3
+		curLoc := c.CurrentInstructions().NextBytePosition() + 3
 		start := StartLoop[StartPtr]
 		offSet := start - curLoc
 		c.EmitInstr(OP_JUMP, int16(offSet))
@@ -743,7 +886,7 @@ func (c *Compiler) IfStatement() {
 
 func (c *Compiler) EmitLoop(offset int) {
 	c.EmitInstr(OP_JUMP, int16(offset)-3)
-	currByte := c.CurrentInstructions.CurrentBytePosition()
+	currByte := c.CurrentInstructions().CurrentBytePosition()
 	c.WriteComment(fmt.Sprintf("Jump to %d", currByte+offset))
 }
 
@@ -777,7 +920,7 @@ func (c *Compiler) ForStatement() {
 	if c.Match(TOKEN_STEP) {
 		c.Expression()
 	} else {
-		c.EmitInstr(OP_PUSH, 1)
+		c.EmitOp(OP_PUSH_1)
 		c.SetType(VAL_INTEGER)
 	}
 
@@ -785,19 +928,21 @@ func (c *Compiler) ForStatement() {
 	ridInit := c.GetFreeRegister()
 	namedRegisters[varName] = ridInit
 
-	c.EmitInstr(OP_PUSH, int16(ridInit))
+	c.EmitPushInteger(ridInit)
+
 	c.WriteComment(fmt.Sprintf("Index for register %d", ridInit))
 
 	c.EmitInstr(OP_FOR_LOOP, 9999)
 	c.WriteComment("Execute this many bytes in a loop")
-	currInstr := c.CurrentInstructions.Count - 1
-	start := c.CurrentInstructions.NextBytePosition()
+	currInstr := c.CurrentInstructions().Count - 1
+	start := c.CurrentInstructions().NextBytePosition()
 
 	c.Evaluate()
+	c.EmitOp(OP_CONTINUE)
 
-	end := c.CurrentInstructions.NextBytePosition()
+	end := c.CurrentInstructions().NextBytePosition()
 	// Backpatch the number of bytes the body of the loop takes up
-	c.CurrentInstructions.OpCode[currInstr].Operand = int16(end - start)
+	c.CurrentInstructions().OpCode[currInstr].Operand = int16(end - start)
 
 	// Free the register for future use
 	c.FreeRegister(ridInit)
@@ -811,7 +956,7 @@ func (c *Compiler) WhileStatement() {
 
 	PushLoop(LOOP_WHILE)
 
-	start := c.CurrentInstructions.NextBytePosition()
+	start := c.CurrentInstructions().NextBytePosition()
 	StartPtr++
 	StartLoop[StartPtr] = start
 
@@ -823,7 +968,7 @@ func (c *Compiler) WhileStatement() {
 	c.Evaluate()
 	c.EndScope()
 
-	end := c.CurrentInstructions.NextBytePosition()
+	end := c.CurrentInstructions().NextBytePosition()
 
 	c.EmitLoop(-(end - start))
 	c.PatchJump(exitJump)
@@ -955,6 +1100,67 @@ func (c *Compiler) CaseStatement() {
 	c.EmitOp(OP_POP)
 }
 
+func (c *Compiler) Function(canAssign bool) {
+
+	// Create the function object we're going to fill
+	c.PushInstruction()
+	fn := FunctionVar{
+		paramCount: 0,
+		instr:      NewInstructions(),
+		returnType: VAL_NIL,
+	}
+
+	paramCount := int16(0)
+	// Parenthesis and parameter definition
+	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after function definition.")
+	// Here we just count the parameters
+	if !c.Check(TOKEN_RIGHT_PAREN) {
+		for {
+			paramCount++
+			if paramCount > 1024 {
+				c.ErrorAtCurrent("Cannot have more than 1024 parameters.")
+			}
+			c.DefineParameter()
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+	}
+	fn.paramCount = paramCount
+	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.")
+
+	// If there is a return value, then declare it here
+	isReturnValue := false
+	fn.returnType = c.GetDataType()
+	if fn.returnType != VAL_NIL {
+		isReturnValue = true
+	}
+
+	// Body of the function
+	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.")
+	c.BeginScope()
+	c.Block()
+	c.EndScope()
+	// If this function returns nothing, then return nil
+	if !isReturnValue {
+		c.EmitOp(OP_NIL)
+	}
+	c.ReturnStatement()
+	fn.instr = *c.CurrentInstructions()
+	c.PopInstruction()
+	// The function is created by now, so lets turn it into a chunk
+	// and push the value on to the stack
+	idx := c.MakeConstant(fn.ConvertToObj())
+	c.EmitInstr(OP_FN_CONST, idx)
+	c.WriteComment(fmt.Sprintf("Function at constant index %d", idx))
+	c.SetType(fn.returnType)
+
+	// Display
+	fmt.Printf("=== Function index %d ===\n", idx)
+	fn.instr.Display()
+
+}
+
 func (c *Compiler) Statement() {
 	if c.Match(TOKEN_VAR) {
 		c.DeclareVariable()
@@ -1006,7 +1212,7 @@ func (c *Compiler) Evaluate() {
 }
 
 func (c *Compiler) WriteComment(comment string) {
-	c.CurrentInstructions.WriteComment(comment)
+	c.CurrentInstructions().WriteComment(comment)
 }
 
 func GetTokenType(tokType TokenType) ValueType {

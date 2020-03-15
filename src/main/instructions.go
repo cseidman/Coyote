@@ -1,8 +1,6 @@
-package instructions
+package main
 
 import (
-	. "../common"
-	. "../value"
 	"fmt"
 )
 
@@ -18,6 +16,7 @@ type Instruction struct {
 	OperandCount byte
 	ByteCount    int
 	BytePosition int
+	Line         int
 }
 
 func (i Instruction) ToBytes() []byte {
@@ -29,6 +28,7 @@ func (i Instruction) ToBytes() []byte {
 }
 
 func (i Instruction) Display() {
+	fmt.Printf(" %d ¦ ", i.Line)
 	fmt.Printf("%-15s\t", OpLabel[i.OpCode])
 	if i.OperandCount > 0 {
 		fmt.Printf("%d", i.Operand)
@@ -55,12 +55,15 @@ type Instructions struct {
 }
 
 func NewInstructions() Instructions {
+
+	size := 255 * 255
+
 	return Instructions{
 		Count:        0,
-		OpCode:       make([]Instruction, 1024),
+		OpCode:       make([]Instruction, size),
 		BytePosition: 0,
-		VarResult:    make([]ValueType, 1024),
-		Comments:     make([]string, 1024),
+		VarResult:    make([]ValueType, size),
+		Comments:     make([]string, size),
 
 		ConstantsCount: 0,
 		Constants:      make([]Obj, 16000),
@@ -75,12 +78,13 @@ func (i *Instructions) WriteComment(comment string) {
 	i.Comments[i.Count-1] = comment
 }
 
-func (i *Instructions) WriteInstruction(opcode byte, operand int16) {
+func (i *Instructions) WriteInstruction(opcode byte, operand int16, line int) {
 	instr := Instruction{
 		OpCode:       opcode,
 		Operand:      operand,
 		OperandCount: 1,
 		ByteCount:    3,
+		Line:         line,
 	}
 	i.OpCode[i.Count] = instr
 	i.OpCode[i.Count].BytePosition = i.BytePosition
@@ -89,11 +93,12 @@ func (i *Instructions) WriteInstruction(opcode byte, operand int16) {
 
 }
 
-func (i *Instructions) WriteSimpleInstruction(opcode byte) {
+func (i *Instructions) WriteSimpleInstruction(opcode byte, line int) {
 	instr := Instruction{
 		OpCode:       opcode,
 		OperandCount: 0,
 		ByteCount:    1,
+		Line:         line,
 	}
 	i.OpCode[i.Count] = instr
 	i.OpCode[i.Count].BytePosition = i.BytePosition
@@ -121,8 +126,22 @@ func (i *Instructions) ToByteCode() []byte {
 	return bCode
 }
 
+func (i *Instructions) ToChunk() *Chunk {
+	return &Chunk{
+		Code:           i.ToByteCode(),
+		Count:          i.BytePosition,
+		Constants:      i.Constants,
+		ConstantsCount: len(i.Constants),
+	}
+}
+
 func (i *Instructions) Display() {
-	fmt.Println("=== Instructions ===")
+
+	fmt.Printf("Constants: %d\n", i.ConstantsCount)
+	for c := int16(0); c < i.ConstantsCount; c++ {
+		fmt.Printf("\tIndex: %d Value: %s\n", c, i.Constants[c].ShowValue())
+	}
+
 	bcount := 0
 	for j := 0; j < i.Count; j++ {
 		fmt.Printf("%04d: ", bcount)

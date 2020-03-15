@@ -1,4 +1,4 @@
-package token
+package main
 
 type TokenType int
 
@@ -167,17 +167,17 @@ var TokenLabels = map[string]TokenProperties{
 	"<":  {TOKEN_LESS, true},
 	"<=": {TOKEN_LESS_EQUAL, true},
 	// 30
-	"++":     {TOKEN_PLUS_PLUS, true},
-	"--":     {TOKEN_MINUS_MINUS, true},
-	"@[":     {TOKEN_LEFT_ARRAY, true},
-	"@{":     {TOKEN_LEFT_LIST, true},
-	"and":    {TOKEN_AND, true},
-	"class":  {TOKEN_CLASS, true},
-	"else":   {TOKEN_ELSE, true},
-	"false":  {TOKEN_FALSE, true},
-	"for":    {TOKEN_FOR, true},
-	"func":   {TOKEN_FUNC, true},
-	"select": {TOKEN_SELECT, true},
+	"++":       {TOKEN_PLUS_PLUS, true},
+	"--":       {TOKEN_MINUS_MINUS, true},
+	"@[":       {TOKEN_LEFT_ARRAY, true},
+	"@{":       {TOKEN_LEFT_LIST, true},
+	"and":      {TOKEN_AND, true},
+	"class":    {TOKEN_CLASS, true},
+	"else":     {TOKEN_ELSE, true},
+	"false":    {TOKEN_FALSE, true},
+	"for":      {TOKEN_FOR, true},
+	"function": {TOKEN_FUNC, true},
+	"select":   {TOKEN_SELECT, true},
 	//40
 	"if":     {TOKEN_IF, true},
 	"nil":    {TOKEN_NIL, true},
@@ -192,7 +192,7 @@ var TokenLabels = map[string]TokenProperties{
 	// 50
 	"error":   {TOKEN_ERROR, true},
 	"include": {TOKEN_INCLUDE, true},
-	"integer": {TOKEN_TYPE_INTEGER, true},
+	"int":     {TOKEN_TYPE_INTEGER, true},
 	"float":   {TOKEN_TYPE_FLOAT, true},
 	"bool":    {TOKEN_TYPE_BOOL, true},
 	"string":  {TOKEN_TYPE_STRING, true},

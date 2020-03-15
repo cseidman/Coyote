@@ -1,3 +1,3 @@
-go build main.go
+go build
 main -f ../tests/test.cy
 

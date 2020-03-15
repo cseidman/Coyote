@@ -1,4 +1,4 @@
-package common
+package main
 
 const (
 	OP_HALT byte = iota
@@ -82,6 +82,12 @@ const (
 	OP_BREAK
 	OP_NOT_EQUAL
 	OP_CONTINUE
+	OP_FN_CONST
+	OP_PUSH_0
+	OP_PUSH_1
+	OP_POP_1
+	OP_POP_2
+	OP_POP_3
 )
 
 var OpLabel = map[byte]string{
@@ -181,4 +187,10 @@ var OpLabel = map[byte]string{
 	OP_BREAK:     "OP_BREAK",
 	OP_NOT_EQUAL: "OP_NOT_EQUAL",
 	OP_CONTINUE:  "OP_CONNTINUE",
+	OP_FN_CONST:  "OP_FN_CONST",
+	OP_PUSH_0:    "OP_PUSH_0",
+	OP_PUSH_1:    "OP_PUSH_1",
+	OP_POP_1:     "OP_POP_1",
+	OP_POP_2:     "OP_POP_2",
+	OP_POP_3:     "OP_POP_3",
 }
