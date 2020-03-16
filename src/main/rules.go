@@ -30,7 +30,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},        // TOKEN_PERCENT
 		{nil, nil, nil, PREC_NONE},        // TOKEN_TILDE
 		{nil, nil, nil, PREC_NONE},        // TOKEN_QUESTION
-		{nil, nil, nil, PREC_NONE},        // TOKEN_HAT
+		{nil, c.Binary, nil, PREC_FACTOR}, // TOKEN_HAT
 		{nil, nil, nil, PREC_NONE},        // TOKEN_DOLLAR
 		// 20
 		{nil, nil, nil, PREC_NONE},            // TOKEN_BAR
@@ -57,7 +57,7 @@ func (c *Compiler) LoadRules() {
 		// 40
 		{nil, nil, nil, PREC_NONE},        // TOKEN_CLASS
 		{nil, nil, nil, PREC_NONE},        // TOKEN_ELSE
-		{c.Literal, nil, nil, PREC_NONE},  // TOKEN_FALSE
+		{c.Boolean, nil, nil, PREC_NONE},  // TOKEN_FALSE
 		{nil, nil, nil, PREC_NONE},        // TOKEN_FOR
 		{c.Function, nil, nil, PREC_NONE}, // TOKEN_FUNC
 		{nil, nil, nil, PREC_NONE},        // TOKEN_IF
@@ -68,7 +68,7 @@ func (c *Compiler) LoadRules() {
 		// 50
 		{nil, nil, nil, PREC_NONE},       // TOKEN_SUPER
 		{nil, nil, nil, PREC_NONE},       // TOKEN_THIS
-		{c.Literal, nil, nil, PREC_NONE}, // TOKEN_TRUE
+		{c.Boolean, nil, nil, PREC_NONE}, // TOKEN_TRUE
 		{nil, nil, nil, PREC_NONE},       // TOKEN_VAR
 		{nil, nil, nil, PREC_NONE},       // TOKEN_WHILE
 		{nil, nil, nil, PREC_NONE},       // TOKEN_ERROR

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // Keeps track of break and continue instruction locations
@@ -17,6 +18,11 @@ var BreakPtr int
 
 var StartLoop = make([]int, 255)
 var StartPtr int
+
+// We use this to assign a unique if to every scope defined in the application
+// so that we can know later on that variables declared in a given scope are different
+// to variables of the same name are indeed different despite being in the same depth
+var ScopeId = 0
 
 // Keep track of loop types currently in play
 const (
@@ -82,6 +88,7 @@ type Local struct {
 	depth      int
 	isCaptured bool
 	dataType   ValueType
+	scopeId    int
 }
 
 type Upvalue struct {
@@ -105,8 +112,8 @@ type Compiler struct {
 	Parser *Parser
 	Rules  []ParseRule
 
-	locals     []Local
-	LocalCount int16
+	//locals     []Local
+	//LocalCount int16
 
 	registers []register
 
@@ -271,6 +278,7 @@ func (c *Compiler) AddLocal(name Token) int16 {
 	c.locals[c.LocalCount].name = name
 	c.locals[c.LocalCount].depth = c.ScopeDepth
 	c.locals[c.LocalCount].isCaptured = false
+	c.locals[c.LocalCount].scopeId = ScopeId
 
 	c.LocalCount++
 	return c.LocalCount - 1
@@ -356,7 +364,8 @@ func (c *Compiler) DefineParameter() {
 			break
 		}
 
-		if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) {
+		if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) &&
+			c.locals[i].scopeId == ScopeId {
 			c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 		}
 	}
@@ -374,6 +383,8 @@ func (c *Compiler) GetDataType() ValueType {
 		return VAL_FLOAT
 	} else if c.Match(TOKEN_TYPE_STRING) {
 		return VAL_STRING
+	} else if c.Match(TOKEN_FUNC) {
+		return VAL_FUNCTION
 	}
 	return VAL_NIL
 
@@ -404,7 +415,8 @@ func (c *Compiler) DeclareVariable() {
 				break
 			}
 
-			if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) {
+			if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) &&
+				c.locals[i].scopeId == ScopeId {
 				c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 			}
 		}
@@ -594,7 +606,6 @@ func (c *Compiler) Grouping(canAssign bool) {
 	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression")
 }
 func (c *Compiler) Call(canAssign bool) {
-
 	argumentCount := c.GetArguments()
 	c.EmitInstr(OP_CALL, argumentCount)
 	c.WriteComment(fmt.Sprintf("Function call with %d arguments", argumentCount))
@@ -728,12 +739,14 @@ func (c *Compiler) Binary(canAssign bool) {
 		}
 	case TOKEN_PLUS_PLUS:
 		c.EmitOp(OP_INCREMENT)
+		c.SetType(dType)
+	case TOKEN_HAT:
 		if dType == VAL_INTEGER {
+			c.EmitOp(OP_IEXP)
 			c.SetType(VAL_INTEGER)
-		} else if dType == VAL_FLOAT {
-			c.SetType(VAL_FLOAT)
+		} else {
+			c.Error("Exponents can only be defined on integers")
 		}
-
 	default:
 		return
 	}
@@ -772,10 +785,18 @@ func (c *Compiler) Float(canAssign bool) {
 	c.SetType(VAL_FLOAT)
 
 }
-func (c *Compiler) Browse(canAssign bool)    {}
-func (c *Compiler) and_(canAssign bool)      {}
-func (c *Compiler) or_(canAssign bool)       {}
-func (c *Compiler) Literal(canAssign bool)   {}
+func (c *Compiler) Browse(canAssign bool)  {}
+func (c *Compiler) and_(canAssign bool)    {}
+func (c *Compiler) or_(canAssign bool)     {}
+func (c *Compiler) Literal(canAssign bool) {}
+func (c *Compiler) Boolean(canAssign bool) {
+	value := strings.ToUpper(c.Parser.Previous.ToString())
+	if value == "TRUE" {
+		c.EmitOp(OP_TRUE)
+	} else {
+		c.EmitOp(OP_FALSE)
+	}
+}
 func (c *Compiler) SqlSelect(canAssign bool) {}
 
 func (c *Compiler) Expression() {
@@ -798,6 +819,7 @@ func (c *Compiler) Block() {
 }
 
 func (c *Compiler) BeginScope() {
+	ScopeId++
 	c.ScopeDepth++
 }
 
@@ -1153,7 +1175,8 @@ func (c *Compiler) Function(canAssign bool) {
 	idx := c.MakeConstant(fn.ConvertToObj())
 	c.EmitInstr(OP_FN_CONST, idx)
 	c.WriteComment(fmt.Sprintf("Function at constant index %d", idx))
-	c.SetType(fn.returnType)
+	//c.SetType(fn.returnType)
+	c.SetType(VAL_FUNCTION)
 
 	// Display
 	fmt.Printf("=== Function index %d ===\n", idx)

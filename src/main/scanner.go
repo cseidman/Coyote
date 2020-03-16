@@ -87,6 +87,8 @@ func (s *Scanner) ScanToken() Token {
 		return s.MakeToken(TOKEN_SLASH)
 	case '*':
 		return s.MakeToken(TOKEN_STAR)
+	case '^':
+		return s.MakeToken(TOKEN_HAT)
 	case ':':
 		return s.MakeToken(TOKEN_COLON)
 	case '$':

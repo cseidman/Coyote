@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math"
 )
 
 type CallFrame struct {
@@ -51,6 +52,7 @@ func (v *VM) ReadConstant(index int16) Obj {
 }
 
 func (v *VM) Push(value Obj) {
+
 	v.Stack[v.sp] = value
 	v.sp++
 }
@@ -151,7 +153,7 @@ mainLoop:
 
 func (v *VM) DebugInfo(opCode byte) {
 
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		// Loop over the slots of the current frame
 		if i >= v.sp {
 			// If there are less than 5 elements in the stack then just print blanks
@@ -182,7 +184,7 @@ Main dispatch loop
  --------------------------------------------------------*/
 func (v *VM) Dispatch(opCode byte) {
 
-	//v.DebugInfo(opCode)
+	v.DebugInfo(opCode)
 
 	// Main switch
 	switch opCode {
@@ -305,10 +307,10 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(v.Globals[idx])
 	case OP_SET_GLOBAL:
 		idx := v.GetOperandValue()
-		v.Globals[idx] = v.Peek(0)
+		v.Globals[idx] = v.Pop() //v.Peek(0)
 	case OP_SET_LOCAL:
 		slot := v.GetOperandValue()
-		v.Frame.slots[slot] = v.Peek(0)
+		v.Stack[slot] = v.Peek(0)
 	case OP_GET_LOCAL:
 		slot := v.GetOperandValue()
 		v.Push(v.Frame.slots[slot])
@@ -328,37 +330,62 @@ func (v *VM) Dispatch(opCode byte) {
 		if val.(*ObjBool).Value == false {
 			v.Frame.ip += int(jmpIndex)
 		}
+
 	case OP_JUMP:
 		v.Frame.ip += int(v.GetOperandValue())
+
 	case OP_FOR_LOOP:
 		rgInit := int(v.Pop().(*ObjInteger).Value)
 		bytevals := int(v.GetOperandValue())
 		v.ForLoop(rgInit, bytevals)
+
 	case OP_LESS:
 		rval := v.Pop().ToBytes()
 		lval := v.Pop().ToBytes()
 
 		v.Push(&ObjBool{Value: bytes.Compare(lval, rval) < 0})
+
 	case OP_LESS_EQUAL:
 		rval := v.Pop().ToBytes()
 		lval := v.Pop().ToBytes()
 
 		v.Push(&ObjBool{Value: bytes.Compare(lval, rval) <= 0})
+
 	case OP_GREATER:
 		rval := v.Pop().ToBytes()
 		lval := v.Pop().ToBytes()
 
 		v.Push(&ObjBool{Value: bytes.Compare(lval, rval) > 0})
+
 	case OP_NOT_EQUAL:
 		rval := v.Pop().ToBytes()
 		lval := v.Pop().ToBytes()
 
 		v.Push(&ObjBool{Value: !bytes.Equal(rval, lval)})
+
 	case OP_EQUAL:
 		rval := v.Pop().ToBytes()
 		lval := v.Pop().ToBytes()
 
 		v.Push(&ObjBool{Value: bytes.Equal(rval, lval)})
+
+	case OP_IEXP:
+		pwr := v.Pop().(*ObjInteger).Value
+		lval := v.Pop().(*ObjInteger).Value
+
+		v.Push(&ObjInteger{Value: int64(math.Pow(float64(lval), float64(pwr)))})
+
+	case OP_FEXP:
+		pwr := v.Pop().(*ObjFloat).Value
+		lval := v.Pop().(*ObjFloat).Value
+
+		v.Push(&ObjFloat{Value: math.Pow(lval, pwr)})
+
+	case OP_TRUE:
+		v.Push(&ObjBool{Value: true})
+
+	case OP_FALSE:
+		v.Push(&ObjBool{Value: false})
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

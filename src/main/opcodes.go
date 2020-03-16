@@ -88,6 +88,8 @@ const (
 	OP_POP_1
 	OP_POP_2
 	OP_POP_3
+	OP_IEXP
+	OP_FEXP
 )
 
 var OpLabel = map[byte]string{
@@ -180,17 +182,22 @@ var OpLabel = map[byte]string{
 	OP_GET_REGISTER:    "OP_GET_REGISTER",
 	OP_FOR_LOOP:        "OP_FOR_LOOP",
 
-	OP_ICONST:    "OP_ICONST",
-	OP_FCONST:    "OP_FCONST",
-	OP_SCONST:    "OP_SCONST",
-	OP_BCONST:    "OP_BCONST",
-	OP_BREAK:     "OP_BREAK",
+	OP_ICONST: "OP_ICONST",
+	OP_FCONST: "OP_FCONST",
+	OP_SCONST: "OP_SCONST",
+	OP_BCONST: "OP_BCONST",
+	OP_BREAK:  "OP_BREAK",
+
 	OP_NOT_EQUAL: "OP_NOT_EQUAL",
 	OP_CONTINUE:  "OP_CONNTINUE",
 	OP_FN_CONST:  "OP_FN_CONST",
 	OP_PUSH_0:    "OP_PUSH_0",
-	OP_PUSH_1:    "OP_PUSH_1",
-	OP_POP_1:     "OP_POP_1",
-	OP_POP_2:     "OP_POP_2",
-	OP_POP_3:     "OP_POP_3",
+
+	OP_PUSH_1: "OP_PUSH_1",
+	OP_POP_1:  "OP_POP_1",
+	OP_POP_2:  "OP_POP_2",
+	OP_POP_3:  "OP_POP_3",
+	OP_IEXP:   "OP_IEXP",
+
+	OP_FEXP: "OP_FEXP",
 }

@@ -50,6 +50,9 @@ type Instructions struct {
 	VarResult    []ValueType
 	Comments     []string
 
+	Locals     []Local
+	LocalCount int16
+
 	Constants      []Obj
 	ConstantsCount int16
 }
@@ -67,6 +70,7 @@ func NewInstructions() Instructions {
 
 		ConstantsCount: 0,
 		Constants:      make([]Obj, 16000),
+		Locals:         make([]Local, 16000),
 	}
 }
 
