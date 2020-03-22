@@ -51,8 +51,8 @@ const (
 	// 30
 	TOKEN_PLUS_PLUS
 	TOKEN_MINUS_MINUS
-	TOKEN_LEFT_ARRAY
-	TOKEN_LEFT_LIST
+	TOKEN_ARRAY
+	TOKEN_LIST
 	TOKEN_IDENTIFIER
 	TOKEN_STRING
 	TOKEN_INTEGER
@@ -124,6 +124,7 @@ const (
 	TOKEN_SWITCH
 	TOKEN_BREAK
 	TOKEN_CONTINUE
+	TOKEN_SCAN
 )
 
 type TokenProperties struct {
@@ -169,8 +170,8 @@ var TokenLabels = map[string]TokenProperties{
 	// 30
 	"++":       {TOKEN_PLUS_PLUS, true},
 	"--":       {TOKEN_MINUS_MINUS, true},
-	"@[":       {TOKEN_LEFT_ARRAY, true},
-	"@{":       {TOKEN_LEFT_LIST, true},
+	"@[":       {TOKEN_ARRAY, true},
+	"@{":       {TOKEN_LIST, true},
 	"and":      {TOKEN_AND, true},
 	"class":    {TOKEN_CLASS, true},
 	"else":     {TOKEN_ELSE, true},
@@ -235,6 +236,7 @@ var TokenLabels = map[string]TokenProperties{
 	"switch":   {TOKEN_SWITCH, false},
 	"break":    {TOKEN_BREAK, false},
 	"continue": {TOKEN_CONTINUE, false},
+	"scan":     {TOKEN_SCAN, false},
 }
 
 type Precedence byte

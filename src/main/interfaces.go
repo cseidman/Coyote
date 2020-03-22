@@ -3,7 +3,8 @@ package main
 type VarType byte
 
 const (
-	VAR_SCALAR VarType = iota
+	VAR_UNKNOWN VarType = iota
+	VAR_SCALAR
 	VAR_ARRAY
 	VAR_FUNCTION
 	VAR_HASH

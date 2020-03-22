@@ -14,7 +14,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_PAREN
 		{nil, nil, nil, PREC_NONE},           // TOKEN_LEFT_BRACE
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACE
-		{nil, c.Index, nil, PREC_INDEX},      // TOKEN_LEFT_BRACKET
+		{nil, nil, nil, PREC_INDEX},          // TOKEN_LEFT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_COMMA
 		{nil, c.Dot, nil, PREC_CALL},         // TOKEN_DOT
@@ -46,8 +46,8 @@ func (c *Compiler) LoadRules() {
 		// 30
 		{c.Unary, nil, c.Postary, PREC_INCR}, // TOKEN_PLUS_PLUS
 		{nil, nil, c.Postary, PREC_NONE},     // TOKEN_MINUS_MINUS
-		{c.Array, nil, nil, PREC_ARRAY},      // TOKEN_LEFT_ARRAY
-		{c.HMap, nil, nil, PREC_LIST},        // TOKEN_LEFT_LIST
+		{c.Array, nil, nil, PREC_ARRAY},      // TOKEN_ARRAY
+		{c.HMap, nil, nil, PREC_LIST},        // TOKEN_LIST
 		{c.Variable, nil, nil, PREC_NONE},    // TOKEN_IDENTIFIER
 		{c.String, nil, nil, PREC_NONE},      // TOKEN_STRING
 		{c.Integer, nil, nil, PREC_NONE},     // TOKEN_INTEGER
@@ -118,6 +118,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_SWITCH
 		{nil, nil, nil, PREC_NONE}, // TOKEN_BREAK
 		{nil, nil, nil, PREC_NONE}, // TOKEN_CONTINUE
+		{nil, nil, nil, PREC_NONE}, // TOKEN_SCAN
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

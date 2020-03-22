@@ -22,12 +22,33 @@ var StartPtr int
 // We use this to assign a unique if to every scope defined in the application
 // so that we can know later on that variables declared in a given scope are different
 // to variables of the same name are indeed different despite being in the same depth
-var ScopeId = 0
+var ScopeId = -1
+
+// Keeps track of the last expression's return value
+type ExpressionData struct {
+	Value   ValueType
+	ObjType VarType
+}
+
+var ExpressionValue = make([]ExpressionData, 255)
+var ExpressionValueId int
+
+func PushExpressionValue(data ExpressionData) {
+	ExpressionValue[ExpressionValueId] = data
+
+	ExpressionValueId++
+}
+
+func PopExpressionValue() ExpressionData {
+	ExpressionValueId--
+	return ExpressionValue[ExpressionValueId]
+}
 
 // Keep track of loop types currently in play
 const (
 	LOOP_WHILE byte = iota
 	LOOP_FOR
+	LOOP_SCAN
 )
 
 var LoopType = make([]byte, 255)
@@ -52,6 +73,9 @@ type FunctionVar struct {
 	paramCount int16
 	returnType ValueType
 	instr      Instructions
+
+	Locals     []Local
+	LocalCount int16
 }
 
 func (f *FunctionVar) ConvertToObj() *ObjFunction {
@@ -69,6 +93,7 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 type Global struct {
 	name     Token
 	datatype ValueType
+	objtype  VarType
 }
 
 var GlobalVars = make([]Global, 65000)
@@ -78,7 +103,7 @@ func AddGlobal(tok Token) int16 {
 
 	vType := GetTokenType(tok.Type)
 
-	GlobalVars[GlobalCount] = Global{tok, vType}
+	GlobalVars[GlobalCount] = Global{tok, vType, VAR_UNKNOWN}
 	GlobalCount++
 	return GlobalCount - 1
 }
@@ -89,6 +114,7 @@ type Local struct {
 	isCaptured bool
 	dataType   ValueType
 	scopeId    int
+	objtype    VarType
 }
 
 type Upvalue struct {
@@ -106,14 +132,13 @@ type register struct {
 var registers = make([]register, 256)
 
 type Compiler struct {
-	Instr      []Instructions
-	InstrCount int
+	Functions     []FunctionVar
+	FunctionCount int
+
+	Current *FunctionVar
 
 	Parser *Parser
 	Rules  []ParseRule
-
-	//locals     []Local
-	//LocalCount int16
 
 	registers []register
 
@@ -151,44 +176,38 @@ func Compile(source *string) *ObjFunction {
 Creates and initializes a app ready for use
  ------------------------------------------------------- */
 func NewCompiler(parser *Parser) *Compiler {
+
 	var compiler Compiler
 	compiler.Parser = parser
 
 	compiler.Init()
 
 	compiler.LoadRules()
+
 	return &compiler
 }
 
 func (c *Compiler) Init() {
 
-	c.Instr = make([]Instructions, 256)
+	c.Functions = make([]FunctionVar, 65000)
 
-	c.PushInstruction()
+	c.Functions[c.FunctionCount] = FunctionVar{
+		paramCount: 0,
+		returnType: VAL_NIL,
+		instr:      NewInstructions(),
+		Locals:     make([]Local, 16000),
+		LocalCount: 0,
+	}
 
-	c.LocalCount = 0
+	c.Current = &c.Functions[c.FunctionCount]
+	c.FunctionCount++
+
 	c.ScopeDepth = 0
-	c.locals = make([]Local, 65000)
 
-	c.LocalCount++
-	c.locals[c.LocalCount].depth = 0
-	c.locals[c.LocalCount].isCaptured = false
-	c.locals[c.LocalCount].name.Length = 0
-	c.locals[c.LocalCount].name.Value = []byte(nil)
-}
-
-func (c *Compiler) PushInstruction() {
-	c.Instr[c.InstrCount] = NewInstructions()
-	c.InstrCount++
-}
-
-func (c *Compiler) PopInstruction() *Instructions {
-	c.InstrCount--
-	return &c.Instr[c.InstrCount]
 }
 
 func (c *Compiler) CurrentInstructions() *Instructions {
-	return &c.Instr[c.InstrCount-1]
+	return &c.Current.instr
 }
 
 func (c *Compiler) FreeRegister(location int16) {
@@ -234,6 +253,7 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 }
 
 func (c *Compiler) AddConstant(val Obj) int16 {
+
 	c.CurrentInstructions().Constants[c.CurrentInstructions().ConstantsCount] = val
 	c.CurrentInstructions().ConstantsCount++
 	return c.CurrentInstructions().ConstantsCount - 1
@@ -257,9 +277,12 @@ func (c *Compiler) ResolveGlobal(tok *Token) int16 {
 }
 
 func (c *Compiler) ResolveLocal(tok *Token) int16 {
-	for i := c.LocalCount - 1; i >= 0; i-- {
-		if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) {
-			if c.locals[i].depth == -1 {
+	// Work our way backwards from the bottom of the locals store so we can
+	// identify the variable at lowest scope relative to this one
+	for i := c.Current.LocalCount - 1; i >= 0; i-- {
+
+		if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) {
+			if c.Current.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
 			return i
@@ -270,36 +293,88 @@ func (c *Compiler) ResolveLocal(tok *Token) int16 {
 
 func (c *Compiler) AddLocal(name Token) int16 {
 
-	if c.LocalCount == 16000 {
+	if c.Current.LocalCount == 16000 {
 		c.Error("Too many local variables in function.")
 		return -1
 	}
 
-	c.locals[c.LocalCount].name = name
-	c.locals[c.LocalCount].depth = c.ScopeDepth
-	c.locals[c.LocalCount].isCaptured = false
-	c.locals[c.LocalCount].scopeId = ScopeId
+	c.Current.Locals[c.Current.LocalCount].name = name
+	c.Current.Locals[c.Current.LocalCount].depth = c.ScopeDepth
+	c.Current.Locals[c.Current.LocalCount].isCaptured = false
+	c.Current.Locals[c.Current.LocalCount].scopeId = ScopeId
 
-	c.LocalCount++
-	return c.LocalCount - 1
+	c.Current.LocalCount++
+	return c.Current.LocalCount - 1
 
 }
 
-func (c *Compiler) NamedVariable(canAssign bool) {
+type Address struct {
+	scope       int
+	objtype     VarType
+	baseAddress int16
+	index       int
+}
 
+func (c *Compiler) AddressOfVariable() Address {
+
+	addr := Address{
+		scope:       c.ScopeDepth,
+		objtype:     0,
+		baseAddress: 0,
+	}
+
+	c.Consume(TOKEN_IDENTIFIER, "Expecting variable name after ")
+
+	addr.objtype = VAR_SCALAR
 	tok := c.Parser.Previous
-	var getOp byte
-	var setOp byte
-	var valType ValueType
 
-	//fmt.Printf("Var name: %s at line %d\n",tok.ToString(),c.Parser.Current.Line)
+	if c.Check(TOKEN_LEFT_BRACKET) {
+		addr.objtype = VAR_ARRAY
+	}
 
 	// If it's a local variable, we look for that before globals
 	idx := c.ResolveLocal(&tok)
 	// -1 means it wasn't found
 	if idx != -1 {
-		getOp = OP_GET_LOCAL
-		setOp = OP_SET_LOCAL
+		idx = c.ResolveGlobal(&tok)
+	}
+
+	addr.baseAddress = idx
+	return addr
+}
+
+func (c *Compiler) NamedVariable(canAssign bool) {
+
+	objType := VAR_SCALAR
+
+	isArray := false
+	tok := c.Parser.Previous
+
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		isArray = true
+		c.Expression()
+		data := PopExpressionValue()
+		if data.Value != VAL_INTEGER {
+			c.Error(fmt.Sprintf("Element must be an integer, element is %d", data.Value))
+		}
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array element")
+	}
+
+	var getOp byte
+	var setOp byte
+	var valType ValueType
+
+	// If it's a local variable, we look for that before globals
+	idx := c.ResolveLocal(&tok)
+	// -1 means it wasn't found
+	if idx != -1 {
+		if isArray {
+			getOp = OP_GET_ALOCAL
+			setOp = OP_SET_ALOCAL
+		} else {
+			getOp = OP_GET_LOCAL
+			setOp = OP_SET_LOCAL
+		}
 	} else {
 		// Is it in a register?
 		ridx, ok := namedRegisters[tok.ToString()]
@@ -310,9 +385,16 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			valType = VAL_INTEGER
 		} else {
 			idx = c.ResolveGlobal(&tok)
-			setOp = OP_SET_GLOBAL
-			if idx != -1 {
-				getOp = OP_GET_GLOBAL
+			if isArray {
+				setOp = OP_SET_AGLOBAL
+				if idx != -1 {
+					getOp = OP_GET_AGLOBAL
+				}
+			} else {
+				setOp = OP_SET_GLOBAL
+				if idx != -1 {
+					getOp = OP_GET_GLOBAL
+				}
 			}
 		}
 	}
@@ -320,24 +402,31 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	if canAssign && c.Match(TOKEN_EQUAL) {
 		c.Expression()
 		c.EmitInstr(setOp, idx)
-		valType = c.CurrentInstructions().GetType(0)
-		if setOp == OP_SET_GLOBAL {
+		data := PopExpressionValue()
+		valType = data.Value
+		objType = data.ObjType
+		if setOp == OP_SET_GLOBAL || setOp == OP_SET_AGLOBAL {
 			GlobalVars[idx].datatype = valType
-		} else if setOp == OP_SET_LOCAL {
-			c.locals[idx].dataType = valType
+			GlobalVars[idx].objtype = objType
+		} else if setOp == OP_SET_LOCAL || setOp == OP_SET_ALOCAL {
+			c.Current.Locals[idx].dataType = valType
+			c.Current.Locals[idx].objtype = objType
 		}
+
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
 	} else {
 		c.EmitInstr(getOp, idx)
-		if getOp == OP_GET_GLOBAL {
+		if getOp == OP_GET_GLOBAL || getOp == OP_GET_AGLOBAL {
 			valType = GlobalVars[idx].datatype
-		} else if getOp == OP_GET_LOCAL {
-			valType = c.locals[idx].dataType
+			objType = GlobalVars[idx].objtype
+		} else if getOp == OP_GET_LOCAL || getOp == OP_GET_ALOCAL {
+			valType = c.Current.Locals[idx].dataType
+			objType = c.Current.Locals[idx].objtype
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
 
-	c.SetType(valType)
+	PushExpressionValue(ExpressionData{Value: valType, ObjType: objType})
 }
 
 func (c *Compiler) IdentifierConstant() int16 {
@@ -358,20 +447,20 @@ func (c *Compiler) DefineParameter() {
 
 	var index int16
 
-	for i := c.LocalCount - 1; i >= 0; i-- {
-		if c.locals[i].depth != -1 &&
-			c.locals[i].depth < c.ScopeDepth {
+	for i := c.Current.LocalCount - 1; i >= 0; i-- {
+		if c.Current.Locals[i].depth != -1 &&
+			c.Current.Locals[i].depth < c.ScopeDepth {
 			break
 		}
 
-		if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) &&
-			c.locals[i].scopeId == ScopeId {
+		if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) &&
+			c.Current.Locals[i].scopeId == ScopeId {
 			c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 		}
 	}
 
 	index = c.AddLocal(tok)
-	c.locals[index].dataType = valType
+	c.Current.Locals[index].dataType = valType
 
 }
 
@@ -409,14 +498,14 @@ func (c *Compiler) DeclareVariable() {
 	} else {
 
 		// Otherwise, it's a local variable
-		for i := c.LocalCount - 1; i >= 0; i-- {
-			if c.locals[i].depth != -1 &&
-				c.locals[i].depth < c.ScopeDepth {
+		for i := c.Current.LocalCount - 1; i >= 0; i-- {
+			if c.Current.Locals[i].depth != -1 &&
+				c.Current.Locals[i].depth < c.ScopeDepth {
 				break
 			}
 
-			if c.IdentifiersEqual(tok.Value, c.locals[i].name.Value) &&
-				c.locals[i].scopeId == ScopeId {
+			if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) &&
+				c.Current.Locals[i].scopeId == ScopeId {
 				c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 			}
 		}
@@ -425,22 +514,26 @@ func (c *Compiler) DeclareVariable() {
 	}
 	// If there is an assigment operator after this, then we pop the rvalue
 	// on the stack as well
+	var data ExpressionData
 	if c.Match(TOKEN_EQUAL) {
 		c.Expression()
-		valType = c.CurrentInstructions().GetType(0)
-
+		data = PopExpressionValue()
+		valType = data.Value
 	} else {
 		c.EmitOp(OP_NIL)
+		valType = VAL_NIL
 	}
 	c.EmitInstr(opcode, index)
-	c.SetType(valType)
+	PushExpressionValue(data)
 	c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[opcode], tok.ToString(), index, valType))
 
 	switch opcode {
 	case OP_SET_GLOBAL:
 		GlobalVars[index].datatype = valType
+		GlobalVars[index].objtype = data.ObjType
 	case OP_SET_LOCAL:
-		c.locals[index].dataType = valType
+		c.Current.Locals[index].dataType = valType
+		c.Current.Locals[index].objtype = data.ObjType
 	}
 
 	c.Match(TOKEN_CR) // Remove any CR after the declaration
@@ -526,12 +619,20 @@ func (c *Compiler) Error(message string) {
 	c.ErrorAt(&c.Parser.Previous, message)
 }
 
-func (c *Compiler) SetType(valueType ValueType) {
-	c.CurrentInstructions().AddType(valueType)
-}
-
 func (c *Compiler) EmitOp(opcode byte) {
 	c.CurrentInstructions().WriteSimpleInstruction(opcode, c.Parser.Previous.Line)
+}
+
+func (c *Compiler) EmitOperand(val int16) {
+	c.CurrentInstructions().AddOperand(val)
+}
+
+func (c *Compiler) EmitOperand32(val int32) {
+	c.CurrentInstructions().AddOperand32(val)
+}
+
+func (c *Compiler) EmitOperandByte(val byte) {
+	c.CurrentInstructions().AddByteOperand(val)
 }
 
 func (c *Compiler) EmitPushInteger(val int16) {
@@ -648,12 +749,20 @@ func (c *Compiler) Unary(canAssign bool) {
 	// Compile the operand.
 	c.ParsePrecedence(PREC_UNARY)
 
+	valtype := c.GetDataType()
+
 	// Emit the operator instruction.
 	switch operatorType {
 	case TOKEN_BANG:
 		c.EmitOp(OP_NOT)
 	case TOKEN_MINUS:
-		c.EmitOp(OP_NEGATE)
+		switch valtype {
+		case VAL_INTEGER:
+			c.EmitOp(OP_INEGATE)
+		case VAL_FLOAT:
+			c.EmitOp(OP_FNEGATE)
+		}
+
 	case TOKEN_PLUS_PLUS:
 		c.EmitOp(OP_PREINCREMENT)
 	case TOKEN_MINUS_MINUS:
@@ -671,7 +780,8 @@ func (c *Compiler) Binary(canAssign bool) {
 	rprec := rule.Prec + 1
 	c.ParsePrecedence(rprec)
 
-	ltype := c.CurrentInstructions().GetType(1)
+	data := PopExpressionValue()
+
 	//rtype := c.CurrentInstructions().GetType(0)
 
 	//if ltype != rtype {
@@ -679,71 +789,69 @@ func (c *Compiler) Binary(canAssign bool) {
 	//	return
 	//}
 	// This is the value for both types
-	dType := ltype
 
 	// Emit the operator instruction.
 	switch operatorType {
 	case TOKEN_BANG_EQUAL:
 		c.EmitOp(OP_NOT_EQUAL)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_EQUAL_EQUAL:
 		c.EmitOp(OP_EQUAL)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_GREATER:
 		c.EmitOp(OP_GREATER)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_GREATER_EQUAL:
 		c.EmitOp(OP_GREATER_EQUAL)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_LESS:
 		c.EmitOp(OP_LESS)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_LESS_EQUAL:
 		c.EmitOp(OP_LESS_EQUAL)
-		c.SetType(VAL_BOOL)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_PLUS:
-		if dType == VAL_INTEGER {
+		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_IADD)
-			c.SetType(VAL_INTEGER)
-		} else if dType == VAL_FLOAT {
+			PushExpressionValue(data)
+		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FADD)
-			c.SetType(VAL_FLOAT)
+			PushExpressionValue(data)
 		} else {
 			c.EmitOp(OP_IADD)
-			c.SetType(VAL_INTEGER)
-			//fmt.Printf("Error in the data types %d:%d\n", ltype, rtype)
+			PushExpressionValue(data)
 		}
 	case TOKEN_MINUS:
-		if dType == VAL_INTEGER {
+		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_ISUBTRACT)
-			c.SetType(VAL_INTEGER)
-		} else if dType == VAL_FLOAT {
+			PushExpressionValue(data)
+		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FSUBTRACT)
-			c.SetType(VAL_FLOAT)
+			PushExpressionValue(data)
 		}
 	case TOKEN_STAR:
-		if dType == VAL_INTEGER {
+		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_IMULTIPLY)
-			c.SetType(VAL_INTEGER)
-		} else if dType == VAL_FLOAT {
+			PushExpressionValue(data)
+		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FMULTIPLY)
-			c.SetType(VAL_FLOAT)
+			PushExpressionValue(data)
 		}
 	case TOKEN_SLASH:
-		if dType == VAL_INTEGER {
+		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_IDIVIDE)
-			c.SetType(VAL_INTEGER)
-		} else if dType == VAL_FLOAT {
+			PushExpressionValue(data)
+		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FDIVIDE)
-			c.SetType(VAL_FLOAT)
+			PushExpressionValue(data)
 		}
 	case TOKEN_PLUS_PLUS:
 		c.EmitOp(OP_INCREMENT)
-		c.SetType(dType)
+		PushExpressionValue(data)
 	case TOKEN_HAT:
-		if dType == VAL_INTEGER {
+		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_IEXP)
-			c.SetType(VAL_INTEGER)
+			PushExpressionValue(data)
 		} else {
 			c.Error("Exponents can only be defined on integers")
 		}
@@ -751,8 +859,34 @@ func (c *Compiler) Binary(canAssign bool) {
 		return
 	}
 }
-func (c *Compiler) Dot(canAssign bool)   {}
-func (c *Compiler) Array(canAssign bool) {}
+func (c *Compiler) Dot(canAssign bool) {}
+func (c *Compiler) Array(canAssign bool) {
+	// Find how many items are in this array
+	elements := int16(0)
+	var dType ValueType
+	for {
+		c.Expression()
+		if elements == 0 {
+			dType = c.GetDataType()
+		}
+		if dType != c.GetDataType() {
+			c.Error(fmt.Sprintf("Element %d is incompatible with first element type %d",
+				elements, dType))
+		}
+		elements++
+		if !c.Match(TOKEN_COMMA) {
+			break
+		}
+	}
+	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
+	c.EmitInstr(OP_PUSH, elements)
+	c.EmitInstr(OP_ARRAY, int16(dType))
+	PushExpressionValue(ExpressionData{
+		Value:   dType,
+		ObjType: VAR_ARRAY,
+	})
+
+}
 func (c *Compiler) Index(canAssign bool) {}
 func (c *Compiler) HMap(canAssign bool)  {}
 func (c *Compiler) Variable(canAssign bool) {
@@ -769,26 +903,28 @@ func (c *Compiler) String(canAssign bool) {
 	}
 
 	c.WriteComment(fmt.Sprintf("Value %s at constant index %d", value, idx))
-	c.SetType(VAL_STRING)
+	PushExpressionValue(ExpressionData{Value: VAL_STRING, ObjType: VAR_SCALAR})
 }
 func (c *Compiler) Integer(canAssign bool) {
 	value, _ := strconv.ParseInt(string(c.Parser.Previous.Value), 10, 64)
 	idx := c.MakeConstant(&ObjInteger{Value: value})
 	c.EmitInstr(OP_ICONST, idx)
 	c.WriteComment(fmt.Sprintf("Value %d at constant index %d", value, idx))
-	c.SetType(VAL_INTEGER)
+	PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: VAR_SCALAR})
 }
 func (c *Compiler) Float(canAssign bool) {
 	value, _ := strconv.ParseFloat(string(c.Parser.Previous.Value), 64)
 	idx := c.MakeConstant(&ObjFloat{Value: value})
 	c.EmitInstr(OP_FCONST, idx)
-	c.SetType(VAL_FLOAT)
+	PushExpressionValue(ExpressionData{Value: VAL_FLOAT, ObjType: VAR_SCALAR})
 
 }
-func (c *Compiler) Browse(canAssign bool)  {}
-func (c *Compiler) and_(canAssign bool)    {}
-func (c *Compiler) or_(canAssign bool)     {}
-func (c *Compiler) Literal(canAssign bool) {}
+func (c *Compiler) Browse(canAssign bool) {}
+func (c *Compiler) and_(canAssign bool)   {}
+func (c *Compiler) or_(canAssign bool)    {}
+func (c *Compiler) Literal(canAssign bool) {
+	fmt.Println("LITERAL")
+}
 func (c *Compiler) Boolean(canAssign bool) {
 	value := strings.ToUpper(c.Parser.Previous.ToString())
 	if value == "TRUE" {
@@ -796,6 +932,7 @@ func (c *Compiler) Boolean(canAssign bool) {
 	} else {
 		c.EmitOp(OP_FALSE)
 	}
+	PushExpressionValue(ExpressionData{Value: VAL_BOOL, ObjType: VAR_SCALAR})
 }
 func (c *Compiler) SqlSelect(canAssign bool) {}
 
@@ -826,15 +963,15 @@ func (c *Compiler) BeginScope() {
 func (c *Compiler) EndScope() {
 	c.ScopeDepth--
 
-	for c.LocalCount > 0 &&
-		c.locals[c.LocalCount-1].depth > c.ScopeDepth {
-		if c.locals[c.LocalCount-1].isCaptured {
+	for c.Current.LocalCount > 0 &&
+		c.Current.Locals[c.Current.LocalCount-1].depth > c.ScopeDepth {
+		if c.Current.Locals[c.Current.LocalCount-1].isCaptured {
 			c.EmitOp(OP_CLOSE_UPVALUE)
 		} else {
 			c.EmitOp(OP_POP)
 			c.WriteComment("POP after end of scope")
 		}
-		c.LocalCount--
+		c.Current.LocalCount--
 	}
 }
 
@@ -912,6 +1049,69 @@ func (c *Compiler) EmitLoop(offset int) {
 	c.WriteComment(fmt.Sprintf("Jump to %d", currByte+offset))
 }
 
+func (c *Compiler) ScanStatement() {
+	PushLoop(LOOP_SCAN)
+	c.BeginScope()
+	// Get the address of the object we're scanning
+	c.Expression()
+	data := PopExpressionValue()
+
+	if data.ObjType != VAR_ARRAY {
+		c.Error(fmt.Sprintf("SCAN cannot iterate over %d types", data.ObjType))
+	}
+
+	// Built-in register for the count of the iterator. This isn't declared by the user
+	// and always exists inside this loop
+	reg := c.GetFreeRegister()
+	namedRegisters["$1"] = reg
+
+	// the variable the scan results are kept in
+	idx := int16(-1)
+	if c.Match(TOKEN_TO) {
+
+		var tok Token
+
+		// This is the declaration portion
+		if c.Match(TOKEN_IDENTIFIER) {
+
+			// Get the name of the receiving variable and allocate it to a
+			// local variable slot
+			tok = c.Parser.Previous
+			idx = c.AddLocal(tok)
+			c.WriteComment(fmt.Sprintf("Variable '%s' at local index %d", tok.ToString(), idx))
+		} else {
+			c.ErrorAtCurrent("SCAN initialized incorrectly")
+		}
+	}
+
+	// If we have a conditional
+	if c.Match(TOKEN_FOR) {
+		c.Expression()
+		//exitjump := c.EmitJump(OP_JUMP_IF_FALSE)
+	}
+
+	c.EmitInstr(OP_SCAN, 999)
+	c.WriteComment("Execute this many bytes in a loop")
+	currInstr := c.CurrentInstructions().Count - 1
+	start := c.CurrentInstructions().NextBytePosition()
+
+	c.Evaluate()
+	c.EmitOp(OP_CONTINUE)
+
+	end := c.CurrentInstructions().NextBytePosition()
+	bytes := int16(end - start)
+
+	c.CurrentInstructions().OpCode[currInstr].Operand = append(append(Int16ToBytes(bytes), Int16ToBytes(reg)...), Int16ToBytes(idx)...)
+	// Free the register for future use
+	c.FreeRegister(reg)
+	delete(namedRegisters, "$1")
+
+	c.EndScope()
+
+	PopLoop()
+
+}
+
 func (c *Compiler) ForStatement() {
 	PushLoop(LOOP_FOR)
 	c.BeginScope()
@@ -943,15 +1143,14 @@ func (c *Compiler) ForStatement() {
 		c.Expression()
 	} else {
 		c.EmitOp(OP_PUSH_1)
-		c.SetType(VAL_INTEGER)
+		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: VAR_SCALAR})
 	}
 
 	// Here is where we assign a variable name to the register
 	ridInit := c.GetFreeRegister()
 	namedRegisters[varName] = ridInit
 
-	c.EmitPushInteger(ridInit)
-
+	c.EmitInstr(OP_PUSH, ridInit)
 	c.WriteComment(fmt.Sprintf("Index for register %d", ridInit))
 
 	c.EmitInstr(OP_FOR_LOOP, 9999)
@@ -964,7 +1163,7 @@ func (c *Compiler) ForStatement() {
 
 	end := c.CurrentInstructions().NextBytePosition()
 	// Backpatch the number of bytes the body of the loop takes up
-	c.CurrentInstructions().OpCode[currInstr].Operand = int16(end - start)
+	c.CurrentInstructions().OpCode[currInstr].Operand = Int16ToBytes(int16(end - start))
 
 	// Free the register for future use
 	c.FreeRegister(ridInit)
@@ -1125,12 +1324,29 @@ func (c *Compiler) CaseStatement() {
 func (c *Compiler) Function(canAssign bool) {
 
 	// Create the function object we're going to fill
-	c.PushInstruction()
 	fn := FunctionVar{
 		paramCount: 0,
 		instr:      NewInstructions(),
 		returnType: VAL_NIL,
+		Locals:     make([]Local, 65000),
 	}
+
+	// Add the function to the compiler's function stack
+	c.Functions[c.FunctionCount] = fn
+	c.FunctionCount++
+
+	// And set this function as the current compiler's function
+	c.Current = &fn
+
+	c.BeginScope()
+
+	// Set up the locals for this function
+	c.Current.LocalCount++
+
+	c.Current.Locals[c.Current.LocalCount].depth = 0
+	c.Current.Locals[c.Current.LocalCount].isCaptured = false
+	c.Current.Locals[c.Current.LocalCount].name.Length = 0
+	c.Current.Locals[c.Current.LocalCount].name.Value = []byte(nil)
 
 	paramCount := int16(0)
 	// Parenthesis and parameter definition
@@ -1148,40 +1364,47 @@ func (c *Compiler) Function(canAssign bool) {
 			}
 		}
 	}
-	fn.paramCount = paramCount
+	c.Current.paramCount = paramCount
 	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.")
 
 	// If there is a return value, then declare it here
 	isReturnValue := false
-	fn.returnType = c.GetDataType()
-	if fn.returnType != VAL_NIL {
+	c.Current.returnType = c.GetDataType()
+	if c.Current.returnType != VAL_NIL {
 		isReturnValue = true
 	}
 
 	// Body of the function
 	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.")
-	c.BeginScope()
 	c.Block()
-	c.EndScope()
 	// If this function returns nothing, then return nil
 	if !isReturnValue {
 		c.EmitOp(OP_NIL)
 	}
 	c.ReturnStatement()
-	fn.instr = *c.CurrentInstructions()
-	c.PopInstruction()
-	// The function is created by now, so lets turn it into a chunk
-	// and push the value on to the stack
-	idx := c.MakeConstant(fn.ConvertToObj())
-	c.EmitInstr(OP_FN_CONST, idx)
-	c.WriteComment(fmt.Sprintf("Function at constant index %d", idx))
-	//c.SetType(fn.returnType)
-	c.SetType(VAL_FUNCTION)
+	c.EndScope()
 
 	// Display
-	fmt.Printf("=== Function index %d ===\n", idx)
-	fn.instr.Display()
+	fmt.Print("=== Function ===\n")
+	fmt.Printf("Parameters: %d\n", c.Current.paramCount)
+	c.Current.instr.Display()
 
+	c.FunctionCount--
+	prev := c.Current
+	c.Current = &c.Functions[c.FunctionCount-1]
+
+	// The function is created by now, so lets turn it into a chunk
+	// and push the value on to the stack
+	if c.FunctionCount > 0 {
+		idx := c.MakeConstant(prev.ConvertToObj())
+		// Pop out of this function definition
+		c.EmitInstr(OP_FN_CONST, idx)
+		c.WriteComment(fmt.Sprintf("Function at constant index %d in scope %d", idx, c.ScopeDepth))
+		PushExpressionValue(ExpressionData{
+			Value:   c.Current.returnType,
+			ObjType: VAR_FUNCTION,
+		})
+	}
 }
 
 func (c *Compiler) Statement() {
@@ -1201,6 +1424,8 @@ func (c *Compiler) Statement() {
 		c.IfStatement()
 	} else if c.Match(TOKEN_RETURN) {
 		c.ReturnStatement()
+	} else if c.Match(TOKEN_SCAN) {
+		c.ScanStatement()
 	} else if c.Match(TOKEN_FOR) {
 		c.ForStatement()
 	} else if c.Match(TOKEN_WHILE) {

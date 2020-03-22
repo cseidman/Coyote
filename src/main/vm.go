@@ -27,7 +27,8 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	Registers []int64
+	Registers   []int64
+	ObjRegister []Obj
 }
 
 func (v *VM) GetByteCode() *[]byte {
@@ -119,7 +120,67 @@ func (v *VM) Interpret() {
 	}
 }
 
-func (v *VM) ForLoop(fromReg int, bytes int) {
+func (v *VM) Scan() {
+	// Get the object we're scanning from the stack
+	obj := v.Peek(0)
+
+	switch obj.Type() {
+	case VAL_ARRAY:
+		v.ScanArray()
+	}
+
+}
+
+// Handles the scan
+func (v *VM) ScanArray() {
+
+	bytes := int(v.GetOperandValue())
+	counterReg := int(v.GetOperandValue())
+	localIndex := int(v.GetOperandValue())
+
+	// Initialize the register
+	v.Registers[counterReg] = 0
+
+	// Get the object with an iterator
+	obj := v.Pop().(*ObjArray)
+
+	startIp := v.Frame.ip
+	stackPtr := v.sp
+
+mainLoop:
+	for i := 0; i < obj.ElementCount; i++ {
+
+		// if there was a target variable assigned
+		if localIndex != -1 {
+			v.Frame.slots[localIndex] = obj.GetElement(int64(i))
+		}
+
+		v.Registers[counterReg]++
+
+		for {
+			v.Frame.ip++
+
+			if v.Code[v.Frame.ip] == OP_BREAK {
+				break mainLoop
+			} else if v.Code[v.Frame.ip] == OP_CONTINUE {
+				v.Frame.ip = startIp
+				continue mainLoop
+			}
+			v.Dispatch(v.Code[v.Frame.ip])
+		}
+		// Get back to where we were
+		v.Frame.ip = startIp
+	}
+	v.Frame.ip = startIp + bytes
+	v.sp = stackPtr
+}
+
+// This handles the FOR loop
+func (v *VM) ForLoop() {
+
+	fromReg := int(v.Pop().(*ObjInteger).Value)
+	bytes := int(v.GetOperandValue())
+
 	step := v.Pop().(*ObjInteger).Value
 	to := v.Pop().(*ObjInteger).Value
 	fromVal := v.Pop().(*ObjInteger).Value
@@ -153,19 +214,23 @@ mainLoop:
 
 func (v *VM) DebugInfo(opCode byte) {
 
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 8; i++ {
 		// Loop over the slots of the current frame
 		if i >= v.sp {
 			// If there are less than 5 elements in the stack then just print blanks
 			fmt.Printf("[%s] ", "    ")
 		} else {
 			// Print the value of the current frame
-			fmt.Printf("[%4s] ", v.Stack[v.sp-1-i].ShowValue())
+			if v.Stack[i] == nil {
+				fmt.Printf("[%s] ", "null")
+			} else {
+				fmt.Printf("[%4s] ", v.Stack[i].ShowValue())
+			}
 		}
 	}
 
 	fmt.Print(" | ")
-	fmt.Printf("%d:%d:%d", v.sp, v.Frame.slotptr, v.fp)
+	fmt.Printf("%d:%d:%d", v.sp, v.Frame.slotptr, v.fp-1)
 	fmt.Print(" | ")
 	fmt.Printf("%04d %s", v.Frame.ip, OpLabel[opCode])
 	switch opCode {
@@ -216,7 +281,7 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_CALL:
 		// Get the parameters
 		argCount := int(v.GetOperandValue())
-		function := v.Peek(int(argCount))
+		function := v.Peek(argCount)
 
 		// Push the code into this new frame
 		v.Frame = &v.Frames[v.fp]
@@ -226,7 +291,6 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Frame.function = function.(*ObjFunction)
 		// Reference to the code block
 		v.Code = v.Frame.function.Code.Code[:]
-
 		// This frame's slots line up with the stacks at the point where
 		// the function and the parameters begin on the stack
 		start := v.sp - argCount - 1
@@ -302,28 +366,67 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_PREINCREMENT:
 		//val := v.Pop()+1
 		//v.Push(val)
+
+	case OP_INEGATE:
+		val := -v.Pop().(*ObjInteger).Value
+		v.Push(&ObjInteger{Value: -val})
+
+	case OP_FNEGATE:
+		val := -v.Pop().(*ObjFloat).Value
+		v.Push(&ObjFloat{Value: -val})
+
 	case OP_GET_GLOBAL:
 		idx := v.GetOperandValue()
 		v.Push(v.Globals[idx])
+
 	case OP_SET_GLOBAL:
 		idx := v.GetOperandValue()
 		v.Globals[idx] = v.Pop() //v.Peek(0)
+
 	case OP_SET_LOCAL:
 		slot := v.GetOperandValue()
 		v.Stack[slot] = v.Peek(0)
+
 	case OP_GET_LOCAL:
 		slot := v.GetOperandValue()
-		v.Push(v.Frame.slots[slot])
+		v.Push(v.Stack[slot])
+
 	case OP_SET_REGISTER:
 		idx := v.GetOperandValue()
 		v.Registers[idx] = v.Peek(0).(*ObjInteger).Value
+
 	case OP_GET_REGISTER:
 		idx := v.GetOperandValue()
 		v.Push(&ObjInteger{Value: v.Registers[idx]})
+
+	case OP_GET_ALOCAL:
+		elem := v.Pop().(*ObjInteger).Value
+		slot := v.GetOperandValue()
+		v.Push(v.Frame.slots[slot].(*ObjArray).Elements[elem])
+
+	case OP_SET_ALOCAL:
+		slot := v.GetOperandValue()
+		val := v.Peek(0)
+		elem := v.Pop().(*ObjInteger).Value
+		v.Stack[slot].(*ObjArray).Elements[elem] = val
+
+	case OP_GET_AGLOBAL:
+		elem := v.Pop().(*ObjInteger).Value
+		idx := v.GetOperandValue()
+		v.Push(v.Globals[idx].(*ObjArray).Elements[elem])
+
+	case OP_SET_AGLOBAL:
+		idx := v.GetOperandValue()
+		val := v.Pop()
+		elem := int(v.Peek(0).(*ObjInteger).Value)
+		v.Globals[idx].(*ObjArray).Elements[elem] = val
+
 	case OP_POP:
 		v.sp--
+
 	case OP_PRINT:
 		fmt.Println(v.Pop().ShowValue())
+
 	case OP_JUMP_IF_FALSE:
 		val := v.Peek(0)
 		jmpIndex := v.GetOperandValue()
@@ -335,9 +438,7 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Frame.ip += int(v.GetOperandValue())
 
 	case OP_FOR_LOOP:
-		rgInit := int(v.Pop().(*ObjInteger).Value)
-		bytevals := int(v.GetOperandValue())
-		v.ForLoop(rgInit, bytevals)
+		v.ForLoop()
 
 	case OP_LESS:
 		rval := v.Pop().ToBytes()
@@ -387,6 +488,22 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_FALSE:
 		v.Push(&ObjBool{Value: false})
 
+	case OP_CONTINUE:
+	case OP_ARRAY:
+		elements := v.Pop().(*ObjInteger).Value
+		dType := byte(v.GetOperandValue())
+
+		o := make([]Obj, elements)
+		for i := elements - 1; i >= 0; i-- {
+			o[i] = v.Pop()
+		}
+		v.Push(&ObjArray{
+			ElementCount: int(elements),
+			ElementTypes: ValueType(dType),
+			Elements:     o,
+		})
+	case OP_SCAN:
+		v.Scan()
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
 		return

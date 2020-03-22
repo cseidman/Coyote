@@ -12,7 +12,8 @@ const (
 	OP_GREATER_EQUAL
 	OP_LESS //10
 	OP_LESS_EQUAL
-	OP_NEGATE
+	OP_INEGATE
+	OP_FNEGATE
 	OP_IADD
 	OP_FADD
 	OP_ISUBTRACT //15
@@ -90,6 +91,7 @@ const (
 	OP_POP_3
 	OP_IEXP
 	OP_FEXP
+	OP_SCAN
 )
 
 var OpLabel = map[byte]string{
@@ -106,7 +108,7 @@ var OpLabel = map[byte]string{
 	OP_LESS:          "OP_LESS",
 
 	OP_LESS_EQUAL: "OP_LESS_EQUAL",
-	OP_NEGATE:     "OP_NEGATE",
+	OP_INEGATE:    "OP_INEGATE",
 	OP_NOT:        "OP_NOT",
 	OP_IADD:       "OP_IADD",
 	OP_FADD:       "OP_FADD",
@@ -189,7 +191,7 @@ var OpLabel = map[byte]string{
 	OP_BREAK:  "OP_BREAK",
 
 	OP_NOT_EQUAL: "OP_NOT_EQUAL",
-	OP_CONTINUE:  "OP_CONNTINUE",
+	OP_CONTINUE:  "OP_CONTINUE",
 	OP_FN_CONST:  "OP_FN_CONST",
 	OP_PUSH_0:    "OP_PUSH_0",
 
@@ -199,5 +201,7 @@ var OpLabel = map[byte]string{
 	OP_POP_3:  "OP_POP_3",
 	OP_IEXP:   "OP_IEXP",
 
-	OP_FEXP: "OP_FEXP",
+	OP_FEXP:    "OP_FEXP",
+	OP_FNEGATE: "OP_FNEGATE",
+	OP_SCAN:    "OP_SCAN",
 }

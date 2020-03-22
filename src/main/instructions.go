@@ -12,7 +12,7 @@ type Instr interface {
 
 type Instruction struct {
 	OpCode       byte
-	Operand      int16
+	Operand      []byte //int16
 	OperandCount byte
 	ByteCount    int
 	BytePosition int
@@ -22,7 +22,8 @@ type Instruction struct {
 func (i Instruction) ToBytes() []byte {
 	bCode := []byte{i.OpCode}
 	if i.OperandCount > 0 {
-		bCode = append(bCode, Int16ToBytes(i.Operand)...)
+		//bCode = append(bCode, Int16ToBytes(i.Operand)...)
+		bCode = append(bCode, i.Operand...)
 	}
 	return bCode
 }
@@ -40,19 +41,14 @@ func (i Instruction) GetByteCount() int {
 }
 
 func (i *Instruction) SetOperand(value int16) {
-	i.Operand = value
+	i.Operand = Int16ToBytes(value)
 }
 
 type Instructions struct {
-	Count        int
-	OpCode       []Instruction
-	BytePosition int
-	VarResult    []ValueType
-	Comments     []string
-
-	Locals     []Local
-	LocalCount int16
-
+	Count          int
+	OpCode         []Instruction
+	BytePosition   int
+	Comments       []string
 	Constants      []Obj
 	ConstantsCount int16
 }
@@ -65,17 +61,11 @@ func NewInstructions() Instructions {
 		Count:        0,
 		OpCode:       make([]Instruction, size),
 		BytePosition: 0,
-		VarResult:    make([]ValueType, size),
 		Comments:     make([]string, size),
 
 		ConstantsCount: 0,
 		Constants:      make([]Obj, 16000),
-		Locals:         make([]Local, 16000),
 	}
-}
-
-func (i *Instructions) AddType(varType ValueType) {
-	i.VarResult[i.Count-1] = varType
 }
 
 func (i *Instructions) WriteComment(comment string) {
@@ -85,7 +75,7 @@ func (i *Instructions) WriteComment(comment string) {
 func (i *Instructions) WriteInstruction(opcode byte, operand int16, line int) {
 	instr := Instruction{
 		OpCode:       opcode,
-		Operand:      operand,
+		Operand:      Int16ToBytes(operand),
 		OperandCount: 1,
 		ByteCount:    3,
 		Line:         line,
@@ -110,16 +100,41 @@ func (i *Instructions) WriteSimpleInstruction(opcode byte, line int) {
 	i.BytePosition++
 }
 
+// These are to replace the existing values
+func (i *Instructions) SetOperand32(instructionNumber int, value int32) {
+	i.OpCode[instructionNumber].Operand = Int32ToBytes(value)
+}
+
+func (i *Instructions) SetByteOperand(instructionNumber int, value byte) {
+	i.OpCode[instructionNumber].Operand = []byte{value}
+}
+
 func (i *Instructions) SetOperand(instructionNumber int, value int16) {
-	i.OpCode[instructionNumber].Operand = value
+	i.OpCode[instructionNumber].Operand = Int16ToBytes(value)
+}
+
+// These are to "tack on" extra operands
+func (i *Instructions) AddOperand32(value int32) {
+	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, Int32ToBytes(value)...)
+	i.BytePosition += 4
+}
+
+func (i *Instructions) AddByteOperand(value byte) {
+	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, []byte{value}...)
+	i.BytePosition++
+}
+
+func (i *Instructions) AddOperand(value int16) {
+	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, Int16ToBytes(value)...)
+	i.BytePosition += 2
 }
 
 func (i *Instructions) GetInstruction(instructionNumber int) []byte {
-	return i.OpCode[instructionNumber].ToBytes()
+	return i.OpCode[instructionNumber-1].ToBytes()
 }
 
-func (i *Instructions) GetType(offset int) ValueType {
-	return i.VarResult[i.Count-offset-1]
+func (i *Instructions) GetOpcode(instructionNumber int) byte {
+	return i.OpCode[instructionNumber-1].OpCode
 }
 
 func (i *Instructions) ToByteCode() []byte {
@@ -135,7 +150,7 @@ func (i *Instructions) ToChunk() *Chunk {
 		Code:           i.ToByteCode(),
 		Count:          i.BytePosition,
 		Constants:      i.Constants,
-		ConstantsCount: len(i.Constants),
+		ConstantsCount: int(i.ConstantsCount),
 	}
 }
 

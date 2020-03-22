@@ -11,6 +11,14 @@ type Obj interface {
 	ToBytes() []byte
 }
 
+type Iterator interface {
+	Count() int
+	Next() Obj
+	First() Obj
+	Current() Obj
+	Position() int
+}
+
 // Internal types
 type ObjColumnDef struct {
 	TableName  string
@@ -329,6 +337,25 @@ func (a *ObjArray) Init(v ValueType, e int) {
 	a.ElementTypes = v
 	a.Elements = make([]Obj, e)
 }
+
+// Iterator interface
+func (a *ObjArray) Count() int {
+	return a.ElementCount
+}
+func (a *ObjArray) Next() Obj {
+	a.ElementCount++
+	return a.Elements[a.ElementCount-1]
+}
+func (a *ObjArray) First() Obj {
+	return a.Elements[0]
+}
+func (a *ObjArray) Current() Obj {
+	return a.Elements[a.ElementCount-1]
+}
+func (a *ObjArray) Position() int {
+	return a.ElementCount - 1
+}
+
 func (a *ObjArray) GetElement(element int64) Obj {
 	return a.Elements[element]
 }

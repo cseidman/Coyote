@@ -97,10 +97,10 @@ func (s *Scanner) ScanToken() Token {
 	case '@':
 		if s.Match('[') {
 			s.PushCRMode(true)
-			return s.MakeToken(TOKEN_LEFT_ARRAY)
+			return s.MakeToken(TOKEN_ARRAY)
 		} else if s.Match('{') {
 			s.PushCRMode(true)
-			return s.MakeToken(TOKEN_LEFT_LIST)
+			return s.MakeToken(TOKEN_LIST)
 
 		} else {
 			return s.MakeToken(TOKEN_AT)

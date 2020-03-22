@@ -1,9 +1,6 @@
-var sum = function(x:int, y:int) int {
-    return x+y
+scan @[1,2,3,4,5] to x {
+    print x + 10
+    print x
 }
 
-var exec = function(f:function,x:int,y:int) int {
-    return f(x,y)
-}
 
-print exec(sum,4,5)
