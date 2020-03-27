@@ -1,10 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
+)
+
+/* ------------------------------------------------------
+These are the starting location on the stack
+-------------------------------------------------------- */
+const (
+	GLOBAL_OFFSET    = 0
+	LOCAL_OFFSET     = 16000
+	STACK_OFFSET     = 1024000
+	MAX_MEMORY_SLOTS = 2048000
 )
 
 // Keeps track of break and continue instruction locations
@@ -70,12 +79,15 @@ func PeekLoop() byte {
 
 // Global function namespace
 type FunctionVar struct {
+	Enclosing  *FunctionVar
 	paramCount int16
 	returnType ValueType
 	instr      Instructions
 
-	Locals     []Local
-	LocalCount int16
+	Locals       []Local
+	Upvalues     []Upvalue
+	LocalCount   int16
+	UpvalueCount int16
 }
 
 func (f *FunctionVar) ConvertToObj() *ObjFunction {
@@ -83,7 +95,7 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 	return &ObjFunction{
 		Arity:        f.paramCount,
 		Code:         f.instr.ToChunk(),
-		UpvalueCount: 0,
+		UpvalueCount: int(f.UpvalueCount),
 		FuncType:     TYPE_FUNCTION,
 		Id:           FunctionId,
 	}
@@ -109,7 +121,7 @@ func AddGlobal(tok Token) int16 {
 }
 
 type Local struct {
-	name       Token
+	name       string
 	depth      int
 	isCaptured bool
 	dataType   ValueType
@@ -118,7 +130,7 @@ type Local struct {
 }
 
 type Upvalue struct {
-	Index    int
+	Index    int16
 	IsLocal  bool
 	dataType ValueType
 }
@@ -132,16 +144,16 @@ type register struct {
 var registers = make([]register, 256)
 
 type Compiler struct {
-	Functions     []FunctionVar
-	FunctionCount int
+	//Functions     []FunctionVar
+	//FunctionCount int
 
+	//Enclosing *FunctionVar
 	Current *FunctionVar
 
 	Parser *Parser
 	Rules  []ParseRule
 
-	registers []register
-
+	registers  []register
 	ScopeDepth int
 }
 
@@ -178,6 +190,7 @@ Creates and initializes a app ready for use
 func NewCompiler(parser *Parser) *Compiler {
 
 	var compiler Compiler
+
 	compiler.Parser = parser
 
 	compiler.Init()
@@ -189,18 +202,15 @@ func NewCompiler(parser *Parser) *Compiler {
 
 func (c *Compiler) Init() {
 
-	c.Functions = make([]FunctionVar, 65000)
-
-	c.Functions[c.FunctionCount] = FunctionVar{
+	c.Current = &FunctionVar{
 		paramCount: 0,
+		Enclosing:  nil,
 		returnType: VAL_NIL,
 		instr:      NewInstructions(),
-		Locals:     make([]Local, 16000),
+		Locals:     make([]Local, 65000),
+		Upvalues:   make([]Upvalue, 65000),
 		LocalCount: 0,
 	}
-
-	c.Current = &c.Functions[c.FunctionCount]
-	c.FunctionCount++
 
 	c.ScopeDepth = 0
 
@@ -276,13 +286,13 @@ func (c *Compiler) ResolveGlobal(tok *Token) int16 {
 	return -1
 }
 
-func (c *Compiler) ResolveLocal(tok *Token) int16 {
+func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) int16 {
 	// Work our way backwards from the bottom of the locals store so we can
 	// identify the variable at lowest scope relative to this one
-	for i := c.Current.LocalCount - 1; i >= 0; i-- {
+	for i := fn.LocalCount - 1; i >= 0; i-- {
 
-		if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) {
-			if c.Current.Locals[i].depth == -1 {
+		if c.IdentifiersEqual(name, fn.Locals[i].name) {
+			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
 			return i
@@ -291,7 +301,35 @@ func (c *Compiler) ResolveLocal(tok *Token) int16 {
 	return -1
 }
 
-func (c *Compiler) AddLocal(name Token) int16 {
+func (c *Compiler) AddUpvalue(fn *FunctionVar, index int16, isLocal bool) int16 {
+
+	upvCount := fn.UpvalueCount
+
+	// First check to see if this value has already been tagged as
+	// an upvalue. No point in storing it again.
+	for i := int16(0); i < upvCount; i++ {
+		upVal := fn.Upvalues[i]
+		if upVal.Index == index && upVal.IsLocal == isLocal {
+			// Found one already used. Just send the index back
+			return i
+		}
+	}
+
+	if upvCount >= 16556 {
+		c.Error("Too many closure variables in this function")
+	}
+
+	// Create a new closure
+	fn.Upvalues[upvCount].IsLocal = isLocal
+	fn.Upvalues[upvCount].Index = index
+	fn.Upvalues[upvCount].dataType = fn.Enclosing.Locals[index].dataType
+	fn.UpvalueCount++
+
+	return fn.UpvalueCount - 1
+
+}
+
+func (c *Compiler) AddLocal(name string) int16 {
 
 	if c.Current.LocalCount == 16000 {
 		c.Error("Too many local variables in function.")
@@ -333,7 +371,7 @@ func (c *Compiler) AddressOfVariable() Address {
 	}
 
 	// If it's a local variable, we look for that before globals
-	idx := c.ResolveLocal(&tok)
+	idx := c.ResolveLocal(c.Current, tok.ToString())
 	// -1 means it wasn't found
 	if idx != -1 {
 		idx = c.ResolveGlobal(&tok)
@@ -341,6 +379,39 @@ func (c *Compiler) AddressOfVariable() Address {
 
 	addr.baseAddress = idx
 	return addr
+}
+
+func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) int16 {
+
+	if fn.Enclosing == nil {
+		// There is no function above this one
+		return -1
+	}
+
+	// Resolve the local variable for the enclosing function
+	local := c.ResolveLocal(fn.Enclosing, name)
+
+	// We found the value in the enclosing function, so we
+	// go ahead and add it to the current function's upvalue store
+	if local != -1 {
+		fn.Enclosing.Locals[local].isCaptured = true
+		uix := c.AddUpvalue(fn, local, true)
+		fmt.Printf("*** UIX (1) : %d name: %s ***\n", uix, name)
+		return uix
+	}
+
+	// On the other hand .. if we still didn't find it in the enclosing function
+	// then maybe it's in a function higher up the scope
+	upVal := c.ResolveUpvalue(fn.Enclosing, name)
+	if upVal != -1 {
+		// And if we found it, we add the upvalue to this upvalue
+		uix := c.AddUpvalue(fn, upVal, false)
+		fmt.Printf("*** UIX (2): %d ***\n", uix)
+		return uix
+	}
+	fmt.Printf("Failed to resolve %s\n", name)
+	return -1
+
 }
 
 func (c *Compiler) NamedVariable(canAssign bool) {
@@ -365,7 +436,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	var valType ValueType
 
 	// If it's a local variable, we look for that before globals
-	idx := c.ResolveLocal(&tok)
+	idx := c.ResolveLocal(c.Current, tok.ToString())
 	// -1 means it wasn't found
 	if idx != -1 {
 		if isArray {
@@ -375,7 +446,14 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			getOp = OP_GET_LOCAL
 			setOp = OP_SET_LOCAL
 		}
+
+	} else if idx = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
+
+		getOp = OP_GET_UPVALUE
+		setOp = OP_SET_UPVALUE
+
 	} else {
+
 		// Is it in a register?
 		ridx, ok := namedRegisters[tok.ToString()]
 		if ok {
@@ -411,6 +489,8 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		} else if setOp == OP_SET_LOCAL || setOp == OP_SET_ALOCAL {
 			c.Current.Locals[idx].dataType = valType
 			c.Current.Locals[idx].objtype = objType
+		} else if setOp == OP_SET_UPVALUE {
+			c.Current.Upvalues[idx].dataType = valType
 		}
 
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
@@ -422,6 +502,8 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		} else if getOp == OP_GET_LOCAL || getOp == OP_GET_ALOCAL {
 			valType = c.Current.Locals[idx].dataType
 			objType = c.Current.Locals[idx].objtype
+		} else if getOp == OP_GET_UPVALUE {
+			valType = c.Current.Upvalues[idx].dataType
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
@@ -453,13 +535,13 @@ func (c *Compiler) DefineParameter() {
 			break
 		}
 
-		if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) &&
+		if c.IdentifiersEqual(tok.ToString(), c.Current.Locals[i].name) &&
 			c.Current.Locals[i].scopeId == ScopeId {
 			c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 		}
 	}
 
-	index = c.AddLocal(tok)
+	index = c.AddLocal(tok.ToString())
 	c.Current.Locals[index].dataType = valType
 
 }
@@ -504,13 +586,13 @@ func (c *Compiler) DeclareVariable() {
 				break
 			}
 
-			if c.IdentifiersEqual(tok.Value, c.Current.Locals[i].name.Value) &&
+			if c.IdentifiersEqual(tok.ToString(), c.Current.Locals[i].name) &&
 				c.Current.Locals[i].scopeId == ScopeId {
 				c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
 			}
 		}
 		opcode = OP_SET_LOCAL
-		index = c.AddLocal(tok)
+		index = c.AddLocal(tok.ToString())
 	}
 	// If there is an assigment operator after this, then we pop the rvalue
 	// on the stack as well
@@ -540,8 +622,8 @@ func (c *Compiler) DeclareVariable() {
 
 }
 
-func (c *Compiler) IdentifiersEqual(a []byte, b []byte) bool {
-	return bytes.Equal(a, b)
+func (c *Compiler) IdentifiersEqual(a string, b string) bool {
+	return a == b
 }
 
 // Checks to see if the current token type matches the given
@@ -817,9 +899,6 @@ func (c *Compiler) Binary(canAssign bool) {
 		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FADD)
 			PushExpressionValue(data)
-		} else {
-			c.EmitOp(OP_IADD)
-			PushExpressionValue(data)
 		}
 	case TOKEN_MINUS:
 		if data.Value == VAL_INTEGER {
@@ -836,6 +915,8 @@ func (c *Compiler) Binary(canAssign bool) {
 		} else if data.Value == VAL_FLOAT {
 			c.EmitOp(OP_FMULTIPLY)
 			PushExpressionValue(data)
+		} else {
+			c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
 		}
 	case TOKEN_SLASH:
 		if data.Value == VAL_INTEGER {
@@ -920,8 +1001,26 @@ func (c *Compiler) Float(canAssign bool) {
 
 }
 func (c *Compiler) Browse(canAssign bool) {}
-func (c *Compiler) and_(canAssign bool)   {}
-func (c *Compiler) or_(canAssign bool)    {}
+func (c *Compiler) and_(canAssign bool) {
+	endJump := c.EmitJump(OP_JUMP_IF_FALSE)
+
+	c.EmitOp(OP_POP)
+	c.ParsePrecedence(PREC_AND)
+
+	c.PatchJump(endJump)
+}
+
+func (c *Compiler) or_(canAssign bool) {
+	elseJump := c.EmitJump(OP_JUMP_IF_FALSE)
+	endJump := c.EmitJump(OP_JUMP)
+
+	c.PatchJump(elseJump)
+	c.EmitOp(OP_POP)
+
+	c.ParsePrecedence(PREC_OR)
+	c.PatchJump(endJump)
+}
+
 func (c *Compiler) Literal(canAssign bool) {
 	fmt.Println("LITERAL")
 }
@@ -946,6 +1045,7 @@ func (c *Compiler) ExpressionStatement() {
 	// That's what makes this a "statement" rather than an expression only
 	c.Consume(TOKEN_CR, "Expect 'CR' after expression.")
 	c.EmitOp(OP_POP)
+	c.WriteComment("Pop After expression statement")
 }
 
 func (c *Compiler) Block() {
@@ -1050,66 +1150,32 @@ func (c *Compiler) EmitLoop(offset int) {
 }
 
 func (c *Compiler) ScanStatement() {
-	PushLoop(LOOP_SCAN)
 	c.BeginScope()
-	// Get the address of the object we're scanning
-	c.Expression()
-	data := PopExpressionValue()
+	c.Expression() // Array
 
-	if data.ObjType != VAR_ARRAY {
-		c.Error(fmt.Sprintf("SCAN cannot iterate over %d types", data.ObjType))
-	}
+	// Manages the target variable
+	c.Consume(TOKEN_TO, "Expect 'to' after the object declaration")
+	c.Consume(TOKEN_IDENTIFIER, "Expect variable name after 'to'")
 
-	// Built-in register for the count of the iterator. This isn't declared by the user
-	// and always exists inside this loop
+	idx := c.AddLocal(c.Parser.Previous.ToString())
+	c.EmitInstr(OP_PUSH, idx)
+	c.WriteComment(fmt.Sprintf("Push variable index %d", idx))
+
+	// Keeps track of the iterator
 	reg := c.GetFreeRegister()
-	namedRegisters["$1"] = reg
+	c.EmitInstr(OP_PUSH, reg)
+	c.WriteComment(fmt.Sprintf("Push register index %d", reg))
 
-	// the variable the scan results are kept in
-	idx := int16(-1)
-	if c.Match(TOKEN_TO) {
+	scanJump := c.EmitJump(OP_SCAN)
 
-		var tok Token
-
-		// This is the declaration portion
-		if c.Match(TOKEN_IDENTIFIER) {
-
-			// Get the name of the receiving variable and allocate it to a
-			// local variable slot
-			tok = c.Parser.Previous
-			idx = c.AddLocal(tok)
-			c.WriteComment(fmt.Sprintf("Variable '%s' at local index %d", tok.ToString(), idx))
-		} else {
-			c.ErrorAtCurrent("SCAN initialized incorrectly")
-		}
-	}
-
-	// If we have a conditional
-	if c.Match(TOKEN_FOR) {
-		c.Expression()
-		//exitjump := c.EmitJump(OP_JUMP_IF_FALSE)
-	}
-
-	c.EmitInstr(OP_SCAN, 999)
-	c.WriteComment("Execute this many bytes in a loop")
-	currInstr := c.CurrentInstructions().Count - 1
-	start := c.CurrentInstructions().NextBytePosition()
-
+	// Run the body of the code
 	c.Evaluate()
 	c.EmitOp(OP_CONTINUE)
 
-	end := c.CurrentInstructions().NextBytePosition()
-	bytes := int16(end - start)
-
-	c.CurrentInstructions().OpCode[currInstr].Operand = append(append(Int16ToBytes(bytes), Int16ToBytes(reg)...), Int16ToBytes(idx)...)
-	// Free the register for future use
-	c.FreeRegister(reg)
-	delete(namedRegisters, "$1")
+	c.PatchJump(scanJump)
 
 	c.EndScope()
-
-	PopLoop()
-
+	c.FreeRegister(reg)
 }
 
 func (c *Compiler) ForStatement() {
@@ -1178,14 +1244,16 @@ func (c *Compiler) WhileStatement() {
 	PushLoop(LOOP_WHILE)
 
 	start := c.CurrentInstructions().NextBytePosition()
-	StartPtr++
-	StartLoop[StartPtr] = start
+	//StartPtr++
+	//StartLoop[StartPtr] = start
 
 	// Logical expression should return a boolean
 	c.BeginScope()
 	c.Expression()
 
 	exitJump := c.EmitJump(OP_JUMP_IF_FALSE)
+	c.EmitOp(OP_POP)
+
 	c.Evaluate()
 	c.EndScope()
 
@@ -1193,9 +1261,12 @@ func (c *Compiler) WhileStatement() {
 
 	c.EmitLoop(-(end - start))
 	c.PatchJump(exitJump)
+
+	c.EmitOp(OP_POP)
 	c.PatchBreaks()
 
-	StartPtr--
+	//StartPtr--
+
 	PopLoop()
 }
 
@@ -1324,19 +1395,18 @@ func (c *Compiler) CaseStatement() {
 func (c *Compiler) Function(canAssign bool) {
 
 	// Create the function object we're going to fill
-	fn := FunctionVar{
+	fn := &FunctionVar{
 		paramCount: 0,
 		instr:      NewInstructions(),
 		returnType: VAL_NIL,
 		Locals:     make([]Local, 65000),
+		Upvalues:   make([]Upvalue, 65000),
 	}
 
-	// Add the function to the compiler's function stack
-	c.Functions[c.FunctionCount] = fn
-	c.FunctionCount++
-
-	// And set this function as the current compiler's function
-	c.Current = &fn
+	// Set the current function as the enclosing function of this new function
+	fn.Enclosing = c.Current
+	// Make the current function into the new function
+	c.Current = fn
 
 	c.BeginScope()
 
@@ -1345,8 +1415,6 @@ func (c *Compiler) Function(canAssign bool) {
 
 	c.Current.Locals[c.Current.LocalCount].depth = 0
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
-	c.Current.Locals[c.Current.LocalCount].name.Length = 0
-	c.Current.Locals[c.Current.LocalCount].name.Value = []byte(nil)
 
 	paramCount := int16(0)
 	// Parenthesis and parameter definition
@@ -1387,24 +1455,35 @@ func (c *Compiler) Function(canAssign bool) {
 	// Display
 	fmt.Print("=== Function ===\n")
 	fmt.Printf("Parameters: %d\n", c.Current.paramCount)
+	fmt.Printf("Closures: %d\n", c.Current.UpvalueCount)
 	c.Current.instr.Display()
 
-	c.FunctionCount--
+	// Return back to the calling function
 	prev := c.Current
-	c.Current = &c.Functions[c.FunctionCount-1]
+	c.Current = c.Current.Enclosing
 
 	// The function is created by now, so lets turn it into a chunk
 	// and push the value on to the stack
-	if c.FunctionCount > 0 {
-		idx := c.MakeConstant(prev.ConvertToObj())
-		// Pop out of this function definition
-		c.EmitInstr(OP_FN_CONST, idx)
-		c.WriteComment(fmt.Sprintf("Function at constant index %d in scope %d", idx, c.ScopeDepth))
-		PushExpressionValue(ExpressionData{
-			Value:   c.Current.returnType,
-			ObjType: VAR_FUNCTION,
-		})
+	idx := c.MakeConstant(prev.ConvertToObj())
+
+	// Pop out of this function definition
+	c.EmitInstr(OP_CLOSURE, idx)
+	c.WriteComment(fmt.Sprintf("Closure index %d scope %d upvalues: %d", idx, c.ScopeDepth, c.Current.UpvalueCount))
+
+	for i := int16(0); i < prev.UpvalueCount; i++ {
+		b1 := byte(0)
+		if prev.Upvalues[i].IsLocal {
+			b1 = 1
+		}
+		c.EmitOperandByte(b1)
+		c.EmitOperand(prev.Upvalues[i].Index)
 	}
+
+	PushExpressionValue(ExpressionData{
+		Value:   prev.returnType,
+		ObjType: VAR_FUNCTION,
+	})
+
 }
 
 func (c *Compiler) Statement() {

@@ -7,8 +7,8 @@ import (
 )
 
 type CallFrame struct {
-	function *ObjFunction
-
+	//function *ObjFunction
+	Closure *ObjClosure
 	ip      int
 	slots   []Obj
 	slotptr int
@@ -27,12 +27,13 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	Registers   []int64
-	ObjRegister []Obj
+	Registers    []int64
+	ObjRegister  []Obj
+	OpenUpvalues *ObjUpvalue
 }
 
 func (v *VM) GetByteCode() *[]byte {
-	return &v.Frame.function.Code.Code
+	return &v.Frame.Closure.Function.Code.Code
 }
 
 func (v *VM) PushFrame() {
@@ -45,11 +46,11 @@ func (v *VM) PushFrame() {
 func (v *VM) PopFrame() {
 	v.fp--
 	v.Frame = &v.Frames[v.fp]
-	v.Code = v.Frame.function.Code.Code[:]
+	v.Code = v.Frame.Closure.Function.Code.Code[:]
 }
 
 func (v *VM) ReadConstant(index int16) Obj {
-	return v.Frame.function.Code.Constants[index]
+	return v.Frame.Closure.Function.Code.Constants[index]
 }
 
 func (v *VM) Push(value Obj) {
@@ -79,6 +80,62 @@ func (v *VM) GetOperand() Obj {
 	return v.ReadConstant(val)
 }
 
+func (v *VM) GetByte() byte {
+	val := v.Code[v.Frame.ip+1]
+	v.Frame.ip++
+	return val
+}
+
+func (v *VM) GetBytes(size int) []byte {
+	val := v.Code[v.Frame.ip+1 : (v.Frame.ip + size + 1)]
+	v.Frame.ip += size
+	return val
+}
+
+func (v *VM) NewUpvalue(slot int) ObjUpvalue {
+	return ObjUpvalue{
+		Reference: nil,
+		Next:      nil,
+		Closed:    nil,
+		Location:  slot,
+	}
+}
+
+func (v *VM) CaptureUpvalue(local *Obj, localIndex int) *ObjUpvalue {
+	var prevUpvalue *ObjUpvalue
+	upvalue := v.OpenUpvalues
+
+	// If there is an upvalue and it's local
+	for upvalue != nil && upvalue.Location > localIndex {
+		fmt.Printf("(1)\n")
+		prevUpvalue = upvalue
+		upvalue = upvalue.Next
+	}
+
+	if upvalue != nil && upvalue.Location == localIndex {
+		fmt.Printf("(2)\n")
+		return upvalue
+	}
+
+	createdUpvalue := NewUpvalue(local)
+	createdUpvalue.Next = upvalue
+	if prevUpvalue == nil {
+		v.OpenUpvalues = createdUpvalue
+	} else {
+		prevUpvalue.Next = createdUpvalue
+	}
+	return createdUpvalue
+}
+
+func (v *VM) CloseUpvalues(last *Obj, objIndex int) {
+	for v.OpenUpvalues != nil && v.OpenUpvalues.Location >= objIndex {
+		upvalue := v.OpenUpvalues
+		upvalue.Closed = *upvalue.Reference
+		upvalue.Reference = &upvalue.Closed
+		v.OpenUpvalues = upvalue.Next
+	}
+}
+
 /* --------------------------------------
 First call into the VM
  ---------------------------------------*/
@@ -95,7 +152,13 @@ func Exec(source *string) {
 	fn := Compile(source)
 
 	vm.Frame = &vm.Frames[vm.fp]
-	vm.Frame.function = fn
+	vm.Frame.Closure = &ObjClosure{
+		Function:     fn,
+		Upvalues:     nil,
+		UpvalueCount: 0,
+		Id:           0,
+	}
+
 	vm.Frame.slots = vm.Stack[:]
 	vm.Code = fn.Code.Code[:]
 	vm.Frame.ip = -1
@@ -122,12 +185,12 @@ func (v *VM) Interpret() {
 
 func (v *VM) Scan() {
 	// Get the object we're scanning from the stack
-	obj := v.Peek(0)
+	//obj := v.Peek(0)
 
-	switch obj.Type() {
-	case VAL_ARRAY:
-		v.ScanArray()
-	}
+	//switch obj.Type() {
+	//case VAL_ARRAY:
+	v.ScanArray()
+	//}
 
 }
 
@@ -135,26 +198,24 @@ func (v *VM) Scan() {
 func (v *VM) ScanArray() {
 
 	bytes := int(v.GetOperandValue())
-	counterReg := int(v.GetOperandValue())
-	localIndex := int(v.GetOperandValue())
+
+	localIndex := v.Pop().(*ObjInteger).Value
+	counterReg := v.Pop().(*ObjInteger).Value
 
 	// Initialize the register
 	v.Registers[counterReg] = 0
 
 	// Get the object with an iterator
 	obj := v.Pop().(*ObjArray)
+	elements := obj.ElementCount
 
 	startIp := v.Frame.ip
 	stackPtr := v.sp
 
 mainLoop:
-	for i := 0; i < obj.ElementCount; i++ {
+	for i := 0; i < elements; i++ {
 
-		// if there was a target variable assigned
-		if localIndex != -1 {
-			v.Frame.slots[localIndex] = obj.GetElement(int64(i))
-		}
-
+		v.Frame.slots[localIndex] = obj.GetElement(int64(i))
 		v.Registers[counterReg]++
 
 		for {
@@ -239,6 +300,9 @@ func (v *VM) DebugInfo(opCode byte) {
 		fmt.Printf("\t[%d]", slot)
 	case OP_CALL:
 		fmt.Println()
+	case OP_CLOSURE:
+		slot := BytesToInt16(v.Code[(v.Frame.ip + 1):(v.Frame.ip + 4)])
+		fmt.Printf("\t[%d]", slot)
 	}
 	fmt.Println()
 
@@ -271,26 +335,52 @@ func (v *VM) Dispatch(opCode byte) {
 		prev := v.Frame.slotptr // Get the previous frame's stack position
 		v.Frame = &v.Frames[v.fp-1]
 		v.sp = prev
-		v.Code = v.Frame.function.Code.Code[:]
+		v.Code = v.Frame.Closure.Function.Code.Code[:]
 
 		v.Push(result)
 		return
 
 	case OP_HALT:
 		return
+
+	case OP_CLOSURE:
+		{
+			function := v.GetOperand().(*ObjFunction)
+			closure := NewClosure(function)
+			v.Push(closure)
+			for i := int16(0); i < closure.UpvalueCount; i++ {
+				isLocal := v.GetByte()
+				index := BytesToInt16(v.GetBytes(2))
+				if isLocal == 1 {
+					localVal := v.Stack[v.Frame.slotptr+int(index)]
+					closure.Upvalues[i] = v.CaptureUpvalue(&localVal, int(index))
+				} else {
+					closure.Upvalues[i] = v.Frame.Closure.Upvalues[index]
+				}
+			}
+		}
+
+	case OP_SET_UPVALUE:
+		slot := v.GetOperandValue()
+		*v.Frame.Closure.Upvalues[slot].Reference = v.Peek(0).(*ObjUpvalue)
+
+	case OP_GET_UPVALUE:
+		slot := v.GetOperandValue()
+		v.Push(*v.Frame.Closure.Upvalues[slot].Reference)
+
 	case OP_CALL:
 		// Get the parameters
 		argCount := int(v.GetOperandValue())
-		function := v.Peek(argCount)
+		closure := v.Peek(argCount)
 
 		// Push the code into this new frame
 		v.Frame = &v.Frames[v.fp]
 		v.Frame.ip = -1
 		v.fp++
 
-		v.Frame.function = function.(*ObjFunction)
+		v.Frame.Closure = closure.(*ObjClosure)
 		// Reference to the code block
-		v.Code = v.Frame.function.Code.Code[:]
+		v.Code = v.Frame.Closure.Function.Code.Code[:]
 		// This frame's slots line up with the stacks at the point where
 		// the function and the parameters begin on the stack
 		start := v.sp - argCount - 1
@@ -381,15 +471,15 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_GLOBAL:
 		idx := v.GetOperandValue()
-		v.Globals[idx] = v.Pop() //v.Peek(0)
+		v.Globals[idx] = v.Peek(0)
 
 	case OP_SET_LOCAL:
 		slot := v.GetOperandValue()
-		v.Stack[slot] = v.Peek(0)
+		v.Frame.slots[slot] = v.Peek(0)
 
 	case OP_GET_LOCAL:
 		slot := v.GetOperandValue()
-		v.Push(v.Stack[slot])
+		v.Push(v.Frame.slots[slot])
 
 	case OP_SET_REGISTER:
 		idx := v.GetOperandValue()
@@ -504,6 +594,17 @@ func (v *VM) Dispatch(opCode byte) {
 		})
 	case OP_SCAN:
 		v.Scan()
+
+	case OP_ASIZE:
+		array := v.Peek(1).(*ObjArray)
+		v.Push(&ObjInteger{Value: int64(array.ElementCount)})
+
+	case OP_AINDEX:
+		index := v.Peek(0).(*ObjInteger).Value
+		array := v.Peek(1).(*ObjArray)
+
+		v.Push(array.Elements[index])
+
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
 		return

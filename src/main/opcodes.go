@@ -92,6 +92,8 @@ const (
 	OP_IEXP
 	OP_FEXP
 	OP_SCAN
+	OP_AINDEX
+	OP_ASIZE
 )
 
 var OpLabel = map[byte]string{
@@ -204,4 +206,6 @@ var OpLabel = map[byte]string{
 	OP_FEXP:    "OP_FEXP",
 	OP_FNEGATE: "OP_FNEGATE",
 	OP_SCAN:    "OP_SCAN",
+	OP_AINDEX:  "OP_AINDEX",
+	OP_ASIZE:   "OP_ASIZE",
 }

@@ -45,12 +45,16 @@ type ObjArray struct {
 	Elements     []Obj
 }
 
+type ObjPointer struct {
+}
+
 var FunctionId int
 
 type ObjFunction struct {
 	Arity        int16
 	Code         *Chunk
 	UpvalueCount int
+	Upvalues     []ObjUpvalue
 	FuncType     FunctionType
 	Id           int
 }
@@ -66,7 +70,7 @@ var ClosureId int
 type ObjClosure struct {
 	Function     *ObjFunction
 	Upvalues     []*ObjUpvalue
-	UpvalueCount int
+	UpvalueCount int16
 	Id           int
 }
 
@@ -76,7 +80,7 @@ type ObjUpvalue struct {
 	Reference *Obj
 	Next      *ObjUpvalue
 	Closed    Obj
-	Location  int // Increments at every creation
+	Location  int
 }
 
 type ObjList struct {
@@ -173,7 +177,7 @@ func (u *ObjUpvalue) ToBytes() []byte { return nil }
 func NewUpvalue(slot *Obj) *ObjUpvalue {
 	upvalue := new(ObjUpvalue)
 	upvalue.Reference = slot
-	//upvalue.Closed = new(NULL)
+	upvalue.Closed = new(NULL)
 	upvalue.Next = nil
 	upvalue.Location = ObjLocation
 
@@ -191,11 +195,6 @@ func NewClosure(function *ObjFunction) *ObjClosure {
 	// Make an array of upvalues of the same size as the number of
 	// upvalues in the enclosed function
 	upvalues := make([]*ObjUpvalue, function.UpvalueCount)
-
-	// Set them all to nil (so they don't get garbage collected yet))
-	for i := 0; i < function.UpvalueCount; i++ {
-		upvalues[i] = nil
-	}
 	// Increment the ID
 	ClosureId++
 
@@ -204,7 +203,7 @@ func NewClosure(function *ObjFunction) *ObjClosure {
 	return &ObjClosure{
 		Function:     function,
 		Upvalues:     upvalues,
-		UpvalueCount: function.UpvalueCount,
+		UpvalueCount: int16(function.UpvalueCount),
 		Id:           ClosureId - 1,
 	}
 }
