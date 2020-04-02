@@ -1,16 +1,34 @@
-var xx = function(a:int) function {
-    var tt = function(x:int) int {
-        return x * a
+var x = class {
+    a:int
+    b = method() {
+        print this.a
     }
-    return tt
+    c = method() {
+        this.a = this.a + 11
+        this.b()
+    }
+
+
 }
 
-var y = xx(2)
-var a = y(5)
-var b = y(10)
+var y = class {
+    a:int
+    b = method() {
+        print this.a
+    }
+    c = method() {
+        this.a = this.a + 11
+        this.b()
+    }
 
-if a == 10 and b == 30 {
-    print "OK"
-} else {
-    print "Nope"
+
 }
+
+
+x.a = 100
+y.a = 200
+x.b() // 100
+y.b() // 200
+x.c() // 111
+y.c() // 211
+
