@@ -55,7 +55,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},           // TOKEN_HMAP
 		{nil, c.and_, nil, PREC_AND},         // TOKEN_AND
 		// 40
-		{nil, nil, nil, PREC_NONE},        // TOKEN_CLASS
+		{c.Class, nil, nil, PREC_NONE},    // TOKEN_CLASS
 		{nil, nil, nil, PREC_NONE},        // TOKEN_ELSE
 		{c.Boolean, nil, nil, PREC_NONE},  // TOKEN_FALSE
 		{nil, nil, nil, PREC_NONE},        // TOKEN_FOR
@@ -67,7 +67,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},        // TOKEN_RETURN
 		// 50
 		{nil, nil, nil, PREC_NONE},       // TOKEN_SUPER
-		{nil, nil, nil, PREC_NONE},       // TOKEN_THIS
+		{c.this_, nil, nil, PREC_NONE},   // TOKEN_THIS
 		{c.Boolean, nil, nil, PREC_NONE}, // TOKEN_TRUE
 		{nil, nil, nil, PREC_NONE},       // TOKEN_VAR
 		{nil, nil, nil, PREC_NONE},       // TOKEN_WHILE
@@ -119,6 +119,12 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_BREAK
 		{nil, nil, nil, PREC_NONE}, // TOKEN_CONTINUE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_SCAN
+		{nil, nil, nil, PREC_NONE}, // TOKEN_PROPERTY
+		//100
+		{c.Method, nil, nil, PREC_NONE}, // TOKEN_METHOD
+		{nil, nil, nil, PREC_NONE},      // TOKEN_PRIVATE
+		{nil, nil, nil, PREC_NONE},      // TOKEN_PUBLIC
+		{nil, nil, nil, PREC_NONE},      // TOKEN_PROTECTED
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

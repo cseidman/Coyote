@@ -34,6 +34,7 @@ const (
 	VAL_SQLTABLE
 	VAL_SQLCOLUMN
 	VAL_COLUMN_DEF
+	VAL_METHOD
 )
 
 type FunctionType byte
@@ -41,4 +42,20 @@ type FunctionType byte
 const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
+	TYPE_METHOD
+)
+
+type AccessorType byte
+
+const (
+	PUBLIC AccessorType = iota
+	PRIVATE
+	PROTECTED
+)
+
+type ClassComponentType byte
+
+const (
+	PROPERTY ClassComponentType = iota
+	METHOD
 )

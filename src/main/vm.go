@@ -136,6 +136,55 @@ func (v *VM) CloseUpvalues(last *Obj, objIndex int) {
 	}
 }
 
+func (v *VM) MethodCall() {
+
+	classInst := v.Pop().(*ObjClass)
+	idx := v.GetOperand().(*ObjString).Value
+	closure := classInst.Fields[idx].(*ObjClosure)
+
+	argCount := v.GetOperandValue()
+
+	// Push the code into this new frame
+	v.Frame = &v.Frames[v.fp]
+	v.Frame.ip = -1
+	v.fp++
+
+	v.Frame.Closure = closure
+	// Reference to the code block
+	v.Code = v.Frame.Closure.Function.Code.Code[:]
+	// This frame's slots line up with the stacks at the point where
+	// the function and the parameters begin on the stack
+	start := v.sp - int(argCount)
+
+	v.Frame.slots = v.Stack[start:]
+	v.Frame.slotptr = start + 1
+
+}
+
+func (v *VM) FunctionCall() {
+	// Get the parameters
+	argCount := v.GetOperandValue()
+	closure := v.Peek(int(argCount)).(*ObjClosure)
+	v.ExecCall(closure, argCount+1)
+}
+
+func (v *VM) ExecCall(closure *ObjClosure, argCount int16) {
+	// Push the code into this new frame
+	v.Frame = &v.Frames[v.fp]
+	v.Frame.ip = -1
+	v.fp++
+
+	v.Frame.Closure = closure
+	// Reference to the code block
+	v.Code = v.Frame.Closure.Function.Code.Code[:]
+	// This frame's slots line up with the stacks at the point where
+	// the function and the parameters begin on the stack
+	start := v.sp - int(argCount)
+	//fmt.Printf("Start: %d STackValue: %v\n",start,v.Stack[start].ShowValue())
+	v.Frame.slots = v.Stack[start:]
+	v.Frame.slotptr = start
+}
+
 /* --------------------------------------
 First call into the VM
  ---------------------------------------*/
@@ -343,6 +392,23 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_HALT:
 		return
 
+	case OP_BIND_PROPERTY:
+		propertyName := v.GetOperand().(*ObjString).Value
+		class := v.Peek(1).(*ObjClass)
+
+		class.Fields[propertyName] = v.Pop()
+
+	case OP_CLASS:
+		// Get the subclass if there is one
+		class := &ObjClass{
+			Fields: make(map[string]Obj),
+		}
+		subClass := v.Pop()
+		if subClass.Type() != VAL_NIL {
+			// todo: Subclass logic
+		}
+
+		v.Push(class)
 	case OP_CLOSURE:
 		{
 			function := v.GetOperand().(*ObjFunction)
@@ -369,24 +435,20 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(*v.Frame.Closure.Upvalues[slot].Reference)
 
 	case OP_CALL:
-		// Get the parameters
-		argCount := int(v.GetOperandValue())
-		closure := v.Peek(argCount)
+		v.FunctionCall()
 
-		// Push the code into this new frame
-		v.Frame = &v.Frames[v.fp]
-		v.Frame.ip = -1
-		v.fp++
+	case OP_CALL_METHOD:
+		v.MethodCall()
 
-		v.Frame.Closure = closure.(*ObjClosure)
-		// Reference to the code block
-		v.Code = v.Frame.Closure.Function.Code.Code[:]
-		// This frame's slots line up with the stacks at the point where
-		// the function and the parameters begin on the stack
-		start := v.sp - argCount - 1
-		//fmt.Printf("Start: %d STackValue: %v\n",start,v.Stack[start].ShowValue())
-		v.Frame.slots = v.Stack[start:]
-		v.Frame.slotptr = start
+	case OP_SET_PROPERTY:
+		classInst := v.Peek(1).(*ObjClass)
+		idx := v.GetOperand().(*ObjString).Value
+		classInst.Fields[idx] = v.Pop()
+
+	case OP_GET_PROPERTY:
+		classInst := v.Pop().(*ObjClass)
+		idx := v.GetOperand().(*ObjString).Value
+		v.Push(classInst.Fields[idx])
 
 	case OP_ICONST, OP_FCONST, OP_SCONST, OP_FN_CONST:
 		v.Push(v.GetOperand())

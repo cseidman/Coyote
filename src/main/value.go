@@ -48,6 +48,26 @@ type ObjArray struct {
 type ObjPointer struct {
 }
 
+type ObjMethod struct {
+	Method *ObjClosure
+	Class  *ObjClass
+}
+
+// Interface types
+func (c *ObjMethod) ShowValue() string { return fmt.Sprintf("%s", "<Method>") }
+func (c *ObjMethod) Type() ValueType   { return VAL_METHOD }
+func (c *ObjMethod) ToBytes() []byte   { return nil }
+
+type ObjProperty struct {
+	Property Obj
+	Class    *ObjClass
+}
+
+// Interface types
+func (c *ObjProperty) ShowValue() string { return fmt.Sprintf("%s", "<Property>") }
+func (c *ObjProperty) Type() ValueType   { return c.Property.Type() }
+func (c *ObjProperty) ToBytes() []byte   { return nil }
+
 var FunctionId int
 
 type ObjFunction struct {
@@ -89,51 +109,40 @@ type ObjList struct {
 	List         map[HashKey]Obj
 }
 
+var ClassId int
+
 type ObjClass struct {
-	Name    string
-	Methods map[string]Obj
+	Id    int
+	Class *ObjClass
+
+	Fields     map[string]Obj
+	FieldCount int16
+
+	Methods     []ObjClosure
+	MethodCount int16
 }
 
-type ObjInstance struct {
-	Class  *ObjClass
-	Fields map[string]Obj
+// To Encapulate new types
+// todo Expand the concept of user defined datatypes
+type ObjUdt struct {
+	BaseType   ValueType
+	BaseObject Obj
 }
+
+// Type functions
 
 // Class functions
 func NewClass(className string) *ObjClass {
 	class := new(ObjClass)
-	class.Name = className
-	class.Methods = make(map[string]Obj)
+
+	class.Id = ClassId
+	ClassId++
 	return class
 }
 
-func (c *ObjClass) ShowValue() string { return fmt.Sprintf("%s", c.Name) }
+func (c *ObjClass) ShowValue() string { return fmt.Sprintf("%s", "Class") }
 func (c *ObjClass) Type() ValueType   { return VAL_CLASS }
 func (c *ObjClass) ToBytes() []byte   { return nil }
-
-// Class instance functions
-func NewInstance(class *ObjClass) *ObjInstance {
-	instance := new(ObjInstance)
-	instance.Class = class
-	instance.Fields = make(map[string]Obj)
-	return instance
-}
-
-func (i *ObjInstance) ShowValue() string { return fmt.Sprintf("Instance of %s", i.Class.Name) }
-func (i *ObjInstance) Type() ValueType   { return VAL_INSTANCE }
-func (i *ObjInstance) ToBytes() []byte   { return nil }
-
-func (i *ObjInstance) GetFieldValue(fieldName string) *Obj {
-	if val, ok := i.Fields[fieldName]; ok {
-		return &val
-	} else {
-		return nil
-	}
-}
-
-func (i *ObjInstance) SetFieldValue(fieldName string, val *Obj) {
-	i.Fields[fieldName] = *val
-}
 
 // List functions
 

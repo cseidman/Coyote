@@ -53,6 +53,16 @@ func PopExpressionValue() ExpressionData {
 	return ExpressionValue[ExpressionValueId]
 }
 
+// Utility
+
+func (c *Compiler) ClearCR() {
+	for {
+		if !c.Match(TOKEN_CR) {
+			break
+		}
+	}
+}
+
 // Keep track of loop types currently in play
 const (
 	LOOP_WHILE byte = iota
@@ -77,15 +87,58 @@ func PeekLoop() byte {
 	return LoopType[LoopPtr-1]
 }
 
-// Global function namespace
+type PropertyVar struct {
+	EnclosingClass *ClassVar
+	Access         AccessorType
+	Name           string
+	Index          int16
+	DataType       ValueType
+	ObjType        VarType
+	HasValue       bool
+}
+
+func PushClass() *ClassVar {
+	ClassVarId++
+	return &Classes[ClassVarId-1]
+}
+
+func PopClass() {
+	ClassVarId--
+}
+
+var ClassVarId int
+var Classes = make([]ClassVar, 128)
+
+type ClassVar struct {
+	Id            int
+	Class         *ObjClass
+	Enclosing     *ClassVar
+	Properties    []PropertyVar
+	PropertyCount int16
+}
+
+func NewClassVar() ClassVar {
+	ClassVarId++
+	return ClassVar{
+		Id:            ClassVarId - 1,
+		Enclosing:     nil,
+		Properties:    make([]PropertyVar, 65556),
+		PropertyCount: 0,
+	}
+}
+
+// Function structure
 type FunctionVar struct {
 	Enclosing  *FunctionVar
 	paramCount int16
 	returnType ValueType
 	instr      Instructions
 
-	Locals       []Local
-	Upvalues     []Upvalue
+	Locals   []Local
+	Upvalues []Upvalue
+
+	Classes []Local
+
 	LocalCount   int16
 	UpvalueCount int16
 }
@@ -144,10 +197,6 @@ type register struct {
 var registers = make([]register, 256)
 
 type Compiler struct {
-	//Functions     []FunctionVar
-	//FunctionCount int
-
-	//Enclosing *FunctionVar
 	Current *FunctionVar
 
 	Parser *Parser
@@ -515,6 +564,23 @@ func (c *Compiler) IdentifierConstant() int16 {
 	return c.MakeConstant(&ObjString{Value: string(c.Parser.Previous.Value)})
 }
 
+func (c *Compiler) DefineProperty() {
+	c.Consume(TOKEN_IDENTIFIER, "Expect method name")
+	// Store the token here
+	//tok := c.Parser.Previous
+	var valType ValueType
+
+	c.Consume(TOKEN_COLON, "Expect ':' with type aftermethod")
+	valType = c.GetDataType()
+	if valType == VAL_NIL {
+		c.ErrorAtCurrent("Invalid data type")
+	}
+
+	//var index int16
+	//for
+
+}
+
 func (c *Compiler) DefineParameter() {
 	c.Consume(TOKEN_IDENTIFIER, "Expect parameter name")
 	// Store the token here
@@ -556,8 +622,28 @@ func (c *Compiler) GetDataType() ValueType {
 		return VAL_STRING
 	} else if c.Match(TOKEN_FUNC) {
 		return VAL_FUNCTION
+	} else if c.Match(TOKEN_CLASS) {
+		return VAL_CLASS
+	} else {
+		return VAL_NIL
 	}
-	return VAL_NIL
+
+}
+
+func (c *Compiler) GetObjType() VarType {
+
+	if c.Match(TOKEN_TYPE_INTEGER) {
+		return VAR_SCALAR
+	} else if c.Match(TOKEN_TYPE_FLOAT) {
+		return VAR_SCALAR
+	} else if c.Match(TOKEN_TYPE_STRING) {
+		return VAR_SCALAR
+	} else if c.Match(TOKEN_FUNC) {
+		return VAR_FUNCTION
+	} else if c.Match(TOKEN_ARRAY) {
+		return VAR_ARRAY
+	}
+	return VAR_UNKNOWN
 
 }
 
@@ -603,6 +689,7 @@ func (c *Compiler) DeclareVariable() {
 		valType = data.Value
 	} else {
 		c.EmitOp(OP_NIL)
+		c.WriteComment("No equality token after variable declaration")
 		valType = VAL_NIL
 	}
 	c.EmitInstr(opcode, index)
@@ -794,6 +881,13 @@ func (c *Compiler) Call(canAssign bool) {
 	c.WriteComment(fmt.Sprintf("Function call with %d arguments", argumentCount))
 }
 
+func (c *Compiler) CallMethod(constantIndex int16) {
+
+	argumentCount := c.GetArguments() + 1
+	c.EmitInstr(OP_CALL_METHOD, constantIndex)
+	c.EmitOperand(argumentCount)
+}
+
 func (c *Compiler) GetArguments() int16 {
 	argCount := int16(0)
 	if !c.Check(TOKEN_RIGHT_PAREN) {
@@ -940,7 +1034,34 @@ func (c *Compiler) Binary(canAssign bool) {
 		return
 	}
 }
-func (c *Compiler) Dot(canAssign bool) {}
+
+func (c *Compiler) Dot(canAssign bool) {
+	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after '.'.")
+	name := c.Parser.Previous.ToString()
+
+	isMethod := c.Match(TOKEN_LEFT_PAREN) // Is this is a method?
+
+	idx := c.MakeConstant(&ObjString{name})
+
+	if isMethod {
+		c.CallMethod(idx)
+	} else {
+
+		var getOp byte
+		var setOp byte
+
+		getOp = OP_GET_PROPERTY
+		setOp = OP_SET_PROPERTY
+
+		if canAssign && c.Match(TOKEN_EQUAL) {
+			c.Expression()
+			c.EmitInstr(setOp, idx)
+		} else {
+			c.EmitInstr(getOp, idx)
+		}
+	}
+}
+
 func (c *Compiler) Array(canAssign bool) {
 	// Find how many items are in this array
 	elements := int16(0)
@@ -1392,7 +1513,118 @@ func (c *Compiler) CaseStatement() {
 	c.EmitOp(OP_POP)
 }
 
+func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
+	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after access indicator")
+
+	// Name of the property
+	pName := c.Parser.Previous.ToString()
+	cIdx := c.MakeConstant(&ObjString{pName})
+	c.AddProperty(class, pName)
+
+	if c.Match(TOKEN_EQUAL) {
+		//c.Consume(TOKEN_METHOD,"Expecting 'method' declaration")
+		c.Expression()
+		c.EmitInstr(OP_BIND_PROPERTY, cIdx)
+	} else {
+		//c.EmitOp(OP_NIL)
+	}
+}
+
+func (c *Compiler) AddProperty(class *ClassVar, name string) {
+
+	prop := &class.Properties[class.PropertyCount]
+
+	prop.Name = name
+	if c.Match(TOKEN_COLON) {
+		prop.ObjType = c.GetObjType()
+		prop.DataType = c.GetDataType()
+	} else {
+		// This is a function
+		prop.ObjType = c.GetObjType()
+		prop.DataType = VAL_CLOSURE
+	}
+
+	prop.Index = class.PropertyCount
+	prop.EnclosingClass = class
+
+	class.PropertyCount++
+
+	class.Class.FieldCount = class.PropertyCount
+
+}
+
+func (c *Compiler) ClassComponents(class *ClassVar) {
+	// Default Access indicator is public
+	accessType := TOKEN_PUBLIC
+
+	// If there's an explicit indicator, we consume it here
+	if c.Match(TOKEN_PUBLIC) ||
+		c.Match(TOKEN_PRIVATE) ||
+		c.Match(TOKEN_PROTECTED) {
+
+		accessType = c.Parser.Previous.Type
+	}
+
+	c.CreateClassComponent(class, accessType)
+}
+
+func (c *Compiler) this_(canAssign bool) {
+	c.Variable(false)
+}
+
+func (c *Compiler) Class(canAssign bool) {
+
+	class := &ObjClass{
+		Id:          ClassId,
+		Class:       nil,
+		Fields:      nil,
+		FieldCount:  0,
+		Methods:     nil,
+		MethodCount: 0,
+	}
+
+	vclass := NewClassVar()
+	vclass.Class = class
+
+	ClassId++
+	vclass.Id = ClassId
+
+	// Inherit from this class
+	if c.Match(TOKEN_AS) {
+		c.Consume(TOKEN_IDENTIFIER, "Expect a class variable name")
+		c.EmitOp(OP_SUBCLASS)
+	} else {
+		c.EmitOp(OP_NIL)
+	}
+
+	c.EmitOp(OP_CLASS)
+	PushExpressionValue(ExpressionData{
+		Value:   VAL_CLASS,
+		ObjType: VAR_CLASS,
+	})
+
+	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.")
+	c.ClearCR()
+	// Keep going until we identified all properties and methods
+	for !c.Match(TOKEN_RIGHT_BRACE) && !c.Match(TOKEN_EOF) {
+		c.ClassComponents(&vclass)
+		c.ClearCR()
+	}
+	c.ClearCR()
+
+	ClassId--
+
+}
+
+func (c *Compiler) Method(canAssign bool) {
+	c.Procedure(TYPE_METHOD)
+}
+
 func (c *Compiler) Function(canAssign bool) {
+	c.Procedure(TYPE_FUNCTION)
+}
+
+func (c *Compiler) Procedure(functionType FunctionType) {
 
 	// Create the function object we're going to fill
 	fn := &FunctionVar{
@@ -1410,16 +1642,31 @@ func (c *Compiler) Function(canAssign bool) {
 
 	c.BeginScope()
 
-	// Set up the locals for this function
-	c.Current.LocalCount++
-
 	c.Current.Locals[c.Current.LocalCount].depth = 0
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
 
+	if functionType == TYPE_METHOD {
+		c.Current.Locals[c.Current.LocalCount].name = ""
+	} else {
+		c.Current.Locals[c.Current.LocalCount].name = ""
+	}
+
+	// Set up the locals for this function
+	c.Current.LocalCount++
+
 	paramCount := int16(0)
+
 	// Parenthesis and parameter definition
+
 	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after function definition.")
 	// Here we just count the parameters
+
+	// if it's a method, we add the current class as a parameter
+	if functionType == TYPE_METHOD {
+		index := c.AddLocal("this")
+		c.Current.Locals[index].dataType = VAL_CLASS
+		paramCount++
+	}
 	if !c.Check(TOKEN_RIGHT_PAREN) {
 		for {
 			paramCount++
@@ -1432,6 +1679,7 @@ func (c *Compiler) Function(canAssign bool) {
 			}
 		}
 	}
+
 	c.Current.paramCount = paramCount
 	c.Consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.")
 
@@ -1448,12 +1696,17 @@ func (c *Compiler) Function(canAssign bool) {
 	// If this function returns nothing, then return nil
 	if !isReturnValue {
 		c.EmitOp(OP_NIL)
+		c.WriteComment("In lieu of explicit return value")
 	}
 	c.ReturnStatement()
 	c.EndScope()
 
 	// Display
-	fmt.Print("=== Function ===\n")
+	if functionType == TYPE_FUNCTION {
+		fmt.Print("=== Function ===\n")
+	} else {
+		fmt.Print("=== METHOD ===\n")
+	}
 	fmt.Printf("Parameters: %d\n", c.Current.paramCount)
 	fmt.Printf("Closures: %d\n", c.Current.UpvalueCount)
 	c.Current.instr.Display()

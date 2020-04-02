@@ -125,6 +125,12 @@ const (
 	TOKEN_BREAK
 	TOKEN_CONTINUE
 	TOKEN_SCAN
+	TOKEN_PROPERTY
+	// 100
+	TOKEN_METHOD
+	TOKEN_PRIVATE
+	TOKEN_PUBLIC
+	TOKEN_PROTECTED
 )
 
 type TokenProperties struct {
@@ -228,15 +234,20 @@ var TokenLabels = map[string]TokenProperties{
 	"distinct": {TOKEN_DISTINCT, true},
 	"top":      {TOKEN_TOP, true},
 	//
-	"step":     {TOKEN_STEP, false},
-	"to":       {TOKEN_TO, false},
-	"when":     {TOKEN_WHEN, false},
-	"case":     {TOKEN_CASE, false},
-	"default":  {TOKEN_DEFAULT, false},
-	"switch":   {TOKEN_SWITCH, false},
-	"break":    {TOKEN_BREAK, false},
-	"continue": {TOKEN_CONTINUE, false},
-	"scan":     {TOKEN_SCAN, false},
+	"step":      {TOKEN_STEP, false},
+	"to":        {TOKEN_TO, false},
+	"when":      {TOKEN_WHEN, false},
+	"case":      {TOKEN_CASE, false},
+	"default":   {TOKEN_DEFAULT, false},
+	"switch":    {TOKEN_SWITCH, false},
+	"break":     {TOKEN_BREAK, false},
+	"continue":  {TOKEN_CONTINUE, false},
+	"scan":      {TOKEN_SCAN, false},
+	"property":  {TOKEN_PROPERTY, false},
+	"method":    {TOKEN_METHOD, false},
+	"private":   {TOKEN_PRIVATE, false},
+	"public":    {TOKEN_PUBLIC, false},
+	"protected": {TOKEN_PROTECTED, false},
 }
 
 type Precedence byte
