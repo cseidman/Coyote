@@ -1,3 +1,4 @@
-go build
-main -f ../tests/test.cy
+go build -o coyote.exe
+coyote -f ../tests/test.cy
+
 

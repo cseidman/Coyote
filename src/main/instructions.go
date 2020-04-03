@@ -131,7 +131,6 @@ func (i *Instructions) AddByteOperand(value byte) {
 }
 
 func (i *Instructions) AddOperand(value int16) {
-	fmt.Printf("*** Value: %d\n", value)
 	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, Int16ToBytes(value)...)
 	i.BytePosition += 2
 }

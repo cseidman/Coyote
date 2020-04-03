@@ -156,9 +156,10 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 
 // This is the global variable space
 type Global struct {
-	name     Token
-	datatype ValueType
-	objtype  VarType
+	name          Token
+	datatype      ValueType
+	objtype       VarType
+	IsInitialized bool
 }
 
 var GlobalVars = make([]Global, 65000)
@@ -168,18 +169,19 @@ func AddGlobal(tok Token) int16 {
 
 	vType := GetTokenType(tok.Type)
 
-	GlobalVars[GlobalCount] = Global{tok, vType, VAR_UNKNOWN}
+	GlobalVars[GlobalCount] = Global{tok, vType, VAR_UNKNOWN, false}
 	GlobalCount++
 	return GlobalCount - 1
 }
 
 type Local struct {
-	name       string
-	depth      int
-	isCaptured bool
-	dataType   ValueType
-	scopeId    int
-	objtype    VarType
+	name          string
+	depth         int
+	isCaptured    bool
+	dataType      ValueType
+	scopeId       int
+	objtype       VarType
+	IsInitialized bool
 }
 
 type Upvalue struct {
@@ -204,14 +206,16 @@ type Compiler struct {
 
 	registers  []register
 	ScopeDepth int
+	DebugMode  bool
 }
 
-func Compile(source *string) *ObjFunction {
+func Compile(source *string, dbgMode bool) *ObjFunction {
 
 	// First parse the source
 	parser := NewParser(source)
 
 	compiler := NewCompiler(&parser)
+	compiler.DebugMode = dbgMode
 
 	compiler.Advance()
 	for !compiler.Match(TOKEN_EOF) {
@@ -219,8 +223,10 @@ func Compile(source *string) *ObjFunction {
 	}
 
 	compiler.EmitOp(OP_HALT)
-	fmt.Println("=== Instructions ===")
-	compiler.CurrentInstructions().Display()
+	if dbgMode {
+		fmt.Println("=== Instructions ===")
+		compiler.CurrentInstructions().Display()
+	}
 
 	fn := &ObjFunction{
 		Arity:        0,
@@ -229,7 +235,9 @@ func Compile(source *string) *ObjFunction {
 		FuncType:     TYPE_SCRIPT,
 		Id:           0,
 	}
-
+	if compiler.Parser.HadError {
+		return nil
+	}
 	return fn
 }
 
@@ -445,7 +453,6 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) int16 {
 	if local != -1 {
 		fn.Enclosing.Locals[local].isCaptured = true
 		uix := c.AddUpvalue(fn, local, true)
-		fmt.Printf("*** UIX (1) : %d name: %s ***\n", uix, name)
 		return uix
 	}
 
@@ -455,10 +462,8 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) int16 {
 	if upVal != -1 {
 		// And if we found it, we add the upvalue to this upvalue
 		uix := c.AddUpvalue(fn, upVal, false)
-		fmt.Printf("*** UIX (2): %d ***\n", uix)
 		return uix
 	}
-	fmt.Printf("Failed to resolve %s\n", name)
 	return -1
 
 }
@@ -533,9 +538,23 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		valType = data.Value
 		objType = data.ObjType
 		if setOp == OP_SET_GLOBAL || setOp == OP_SET_AGLOBAL {
+
+			//fmt.Printf("Init: %v valtype: %v datatype %v\n",GlobalVars[idx].IsInitialized, valType, GlobalVars[idx].datatype)
+
+			if GlobalVars[idx].IsInitialized && valType != GlobalVars[idx].datatype {
+				c.Error("Cannot assign incompatible variable")
+			}
+
+			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
+
 		} else if setOp == OP_SET_LOCAL || setOp == OP_SET_ALOCAL {
+			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].dataType {
+				c.Error("Cannot assign incompatible variable")
+			}
+
+			c.Current.Locals[idx].IsInitialized = true
 			c.Current.Locals[idx].dataType = valType
 			c.Current.Locals[idx].objtype = objType
 		} else if setOp == OP_SET_UPVALUE {
@@ -698,9 +717,20 @@ func (c *Compiler) DeclareVariable() {
 
 	switch opcode {
 	case OP_SET_GLOBAL:
+
+		if GlobalVars[index].IsInitialized && valType != GlobalVars[index].datatype {
+			c.Error("Cannot assign incompatible variable")
+		}
+
+		GlobalVars[index].IsInitialized = true
 		GlobalVars[index].datatype = valType
 		GlobalVars[index].objtype = data.ObjType
 	case OP_SET_LOCAL:
+
+		if c.Current.Locals[index].IsInitialized && valType != c.Current.Locals[index].dataType {
+			c.Error("Cannot assign incompatible variable")
+		}
+		c.Current.Locals[index].IsInitialized = true
 		c.Current.Locals[index].dataType = valType
 		c.Current.Locals[index].objtype = data.ObjType
 	}
@@ -1702,15 +1732,16 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	c.EndScope()
 
 	// Display
-	if functionType == TYPE_FUNCTION {
-		fmt.Print("=== Function ===\n")
-	} else {
-		fmt.Print("=== METHOD ===\n")
+	if c.DebugMode {
+		if functionType == TYPE_FUNCTION {
+			fmt.Print("=== Function ===\n")
+		} else {
+			fmt.Print("=== METHOD ===\n")
+		}
+		fmt.Printf("Parameters: %d\n", c.Current.paramCount)
+		fmt.Printf("Closures: %d\n", c.Current.UpvalueCount)
+		c.Current.instr.Display()
 	}
-	fmt.Printf("Parameters: %d\n", c.Current.paramCount)
-	fmt.Printf("Closures: %d\n", c.Current.UpvalueCount)
-	c.Current.instr.Display()
-
 	// Return back to the calling function
 	prev := c.Current
 	c.Current = c.Current.Enclosing

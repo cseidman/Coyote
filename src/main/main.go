@@ -9,13 +9,12 @@ import (
 
 func main() {
 
-	flag.Bool("debug", false, "debug mode")
-
+	dbg := flag.Bool("debug", false, "debug mode")
 	source := flag.String("f", "", "source file")
 
 	flag.Parse()
 
-	//DbgMode = *dbg
+	dbgMode := *dbg
 	SrcFile := *source
 
 	debug.SetGCPercent(-1)
@@ -24,7 +23,7 @@ func main() {
 		repl()
 	} else {
 		start := time.Now()
-		RunFile(SrcFile)
+		RunFile(SrcFile, dbgMode)
 		t := time.Now()
 		elapsed := t.Sub(start)
 		fmt.Printf("\nElapsed: %v\n", elapsed.String())
@@ -44,17 +43,17 @@ func repl() {
 	for {
 		fmt.Printf("> ")
 		if _, err := fmt.Scanln(&line); err != nil {
-			Exec(&line)
+			Exec(&line, false)
 		}
 	}
 }
 
-func RunFile(path string) {
+func RunFile(path string, dbgMode bool) {
 
 	debug.SetGCPercent(-1)
 
 	source := ReadFile(path) + "\n"
-	Exec(&source)
+	Exec(&source, dbgMode)
 	/*
 		if result == INTERPRET_COMPILE_ERROR {
 			os.Exit(65)

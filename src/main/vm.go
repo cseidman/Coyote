@@ -30,6 +30,7 @@ type VM struct {
 	Registers    []int64
 	ObjRegister  []Obj
 	OpenUpvalues *ObjUpvalue
+	DebugMode    bool
 }
 
 func (v *VM) GetByteCode() *[]byte {
@@ -188,7 +189,7 @@ func (v *VM) ExecCall(closure *ObjClosure, argCount int16) {
 /* --------------------------------------
 First call into the VM
  ---------------------------------------*/
-func Exec(source *string) {
+func Exec(source *string, dbgMode bool) {
 
 	vm := VM{
 		fp:        0,
@@ -196,9 +197,15 @@ func Exec(source *string) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
+		DebugMode: dbgMode,
 	}
 
-	fn := Compile(source)
+	fn := Compile(source, dbgMode)
+
+	if fn == nil {
+		fmt.Println("Syntax error")
+		return
+	}
 
 	vm.Frame = &vm.Frames[vm.fp]
 	vm.Frame.Closure = &ObjClosure{
@@ -219,8 +226,10 @@ func Exec(source *string) {
 }
 
 func (v *VM) Interpret() {
+	if v.DebugMode {
+		fmt.Println("=== VM Run ===")
+	}
 
-	fmt.Println("=== VM Run ===")
 	var opCode byte
 	for {
 		v.Frame.ip++
@@ -323,7 +332,6 @@ mainLoop:
 }
 
 func (v *VM) DebugInfo(opCode byte) {
-
 	for i := 0; i < 8; i++ {
 		// Loop over the slots of the current frame
 		if i >= v.sp {
@@ -343,6 +351,7 @@ func (v *VM) DebugInfo(opCode byte) {
 	fmt.Printf("%d:%d:%d", v.sp, v.Frame.slotptr, v.fp-1)
 	fmt.Print(" | ")
 	fmt.Printf("%04d %s", v.Frame.ip, OpLabel[opCode])
+
 	switch opCode {
 	case OP_GET_LOCAL:
 		slot := BytesToInt16(v.Code[(v.Frame.ip + 1):(v.Frame.ip + 3)])
@@ -362,7 +371,9 @@ Main dispatch loop
  --------------------------------------------------------*/
 func (v *VM) Dispatch(opCode byte) {
 
-	v.DebugInfo(opCode)
+	if v.DebugMode {
+		v.DebugInfo(opCode)
+	}
 
 	// Main switch
 	switch opCode {
@@ -414,6 +425,7 @@ func (v *VM) Dispatch(opCode byte) {
 			function := v.GetOperand().(*ObjFunction)
 			closure := NewClosure(function)
 			v.Push(closure)
+
 			for i := int16(0); i < closure.UpvalueCount; i++ {
 				isLocal := v.GetByte()
 				index := BytesToInt16(v.GetBytes(2))
