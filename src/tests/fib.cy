@@ -5,8 +5,5 @@ var fib = function(n:int) {
     return fib(n - 1) + fib(n - 2)
   }
 }
-var i = 32
-//for i=0 to 27 {
-
-    print fib(i)
-//}
+var i = 6
+print fib(i)

@@ -332,18 +332,21 @@ func (c *Compiler) Advance() {
 	c.Parser.Current = c.Parser.NextToken()
 }
 
-func (c *Compiler) ResolveGlobal(tok *Token) int16 {
+func (c *Compiler) ResolveGlobal(tok *Token) (int16, *ExpressionData) {
 	var i int16
 	for i = 0; i < GlobalCount; i++ {
 		if tok.Type == GlobalVars[i].name.Type && tok.ToString() == GlobalVars[i].name.ToString() {
-			return i
+			return i, &ExpressionData{
+				Value:   GlobalVars[i].datatype,
+				ObjType: GlobalVars[i].objtype,
+			}
 		}
 	}
 	c.ErrorAtCurrent(fmt.Sprintf("Global variable '%s' not found", tok.ToString()))
-	return -1
+	return -1, nil
 }
 
-func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) int16 {
+func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) (int16, *ExpressionData) {
 	// Work our way backwards from the bottom of the locals store so we can
 	// identify the variable at lowest scope relative to this one
 	for i := fn.LocalCount - 1; i >= 0; i-- {
@@ -352,10 +355,10 @@ func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) int16 {
 			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
-			return i
+			return i, &ExpressionData{Value: fn.Locals[i].dataType, ObjType: fn.Locals[i].objtype}
 		}
 	}
-	return -1
+	return -1, nil
 }
 
 func (c *Compiler) AddUpvalue(fn *FunctionVar, index int16, isLocal bool) int16 {
@@ -428,43 +431,43 @@ func (c *Compiler) AddressOfVariable() Address {
 	}
 
 	// If it's a local variable, we look for that before globals
-	idx := c.ResolveLocal(c.Current, tok.ToString())
+	idx, _ := c.ResolveLocal(c.Current, tok.ToString())
 	// -1 means it wasn't found
 	if idx != -1 {
-		idx = c.ResolveGlobal(&tok)
+		idx, _ = c.ResolveGlobal(&tok)
 	}
 
 	addr.baseAddress = idx
 	return addr
 }
 
-func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) int16 {
+func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *ExpressionData) {
 
 	if fn.Enclosing == nil {
 		// There is no function above this one
-		return -1
+		return -1, nil
 	}
 
 	// Resolve the local variable for the enclosing function
-	local := c.ResolveLocal(fn.Enclosing, name)
+	local, exprValue := c.ResolveLocal(fn.Enclosing, name)
 
 	// We found the value in the enclosing function, so we
 	// go ahead and add it to the current function's upvalue store
 	if local != -1 {
 		fn.Enclosing.Locals[local].isCaptured = true
 		uix := c.AddUpvalue(fn, local, true)
-		return uix
+		return uix, exprValue
 	}
 
 	// On the other hand .. if we still didn't find it in the enclosing function
 	// then maybe it's in a function higher up the scope
-	upVal := c.ResolveUpvalue(fn.Enclosing, name)
+	upVal, exprValue := c.ResolveUpvalue(fn.Enclosing, name)
 	if upVal != -1 {
 		// And if we found it, we add the upvalue to this upvalue
 		uix := c.AddUpvalue(fn, upVal, false)
-		return uix
+		return uix, exprValue
 	}
-	return -1
+	return -1, nil
 
 }
 
@@ -472,37 +475,64 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 	objType := VAR_SCALAR
 
-	isArray := false
 	tok := c.Parser.Previous
-
-	if c.Match(TOKEN_LEFT_BRACKET) {
-		isArray = true
-		c.Expression()
-		data := PopExpressionValue()
-		if data.Value != VAL_INTEGER {
-			c.Error(fmt.Sprintf("Element must be an integer, element is %d", data.Value))
-		}
-		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array element")
-	}
 
 	var getOp byte
 	var setOp byte
 	var valType ValueType
 
+	isLocal := false
+	isGlobal := false
+	isUpvalue := false
+
+	hasIndex := false
+	isArray := false
+	isHash := false
+
+	// Get the index value and pop it on to the stack
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		hasIndex = true
+		c.Expression()
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
+	}
+
 	// If it's a local variable, we look for that before globals
-	idx := c.ResolveLocal(c.Current, tok.ToString())
+	idx, exprValue := c.ResolveLocal(c.Current, tok.ToString())
 	// -1 means it wasn't found
 	if idx != -1 {
-		if isArray {
+		isLocal = true
+		// If this is an expression of an array element
+		if exprValue.ObjType == VAR_ARRAY && hasIndex {
+			// Get the index value and pop it on to the stack
 			getOp = OP_GET_ALOCAL
 			setOp = OP_SET_ALOCAL
+			isArray = true
+		} else if exprValue.ObjType == VAR_HASH && hasIndex {
+			getOp = OP_GET_HLOCAL
+			setOp = OP_SET_HLOCAL
+			isHash = true
 		} else {
-			getOp = OP_GET_LOCAL
+			switch idx {
+			case 0:
+				getOp = OP_GET_LOCAL_0
+			case 1:
+				getOp = OP_GET_LOCAL_1
+			case 2:
+				getOp = OP_GET_LOCAL_2
+			case 3:
+				getOp = OP_GET_LOCAL_3
+			case 4:
+				getOp = OP_GET_LOCAL_4
+			case 5:
+				getOp = OP_GET_LOCAL_5
+			default:
+				getOp = OP_GET_LOCAL
+			}
 			setOp = OP_SET_LOCAL
 		}
 
-	} else if idx = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
-
+	} else if idx, exprValue = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
+		isUpvalue = true
 		getOp = OP_GET_UPVALUE
 		setOp = OP_SET_UPVALUE
 
@@ -516,16 +546,39 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			setOp = OP_SET_REGISTER
 			valType = VAL_INTEGER
 		} else {
-			idx = c.ResolveGlobal(&tok)
-			if isArray {
+			isGlobal = true
+			idx, exprValue = c.ResolveGlobal(&tok)
+			if exprValue.ObjType == VAR_ARRAY && hasIndex {
 				setOp = OP_SET_AGLOBAL
 				if idx != -1 {
 					getOp = OP_GET_AGLOBAL
 				}
+				isArray = true
+			} else if exprValue.ObjType == VAR_HASH && hasIndex {
+				setOp = OP_SET_HGLOBAL
+				if idx != -1 {
+					getOp = OP_GET_HGLOBAL
+				}
+				isHash = true
 			} else {
 				setOp = OP_SET_GLOBAL
 				if idx != -1 {
-					getOp = OP_GET_GLOBAL
+					switch idx {
+					case 0:
+						getOp = OP_GET_GLOBAL_0
+					case 1:
+						getOp = OP_GET_GLOBAL_1
+					case 2:
+						getOp = OP_GET_GLOBAL_2
+					case 3:
+						getOp = OP_GET_GLOBAL_3
+					case 4:
+						getOp = OP_GET_GLOBAL_4
+					case 5:
+						getOp = OP_GET_GLOBAL_5
+					default:
+						getOp = OP_GET_GLOBAL
+					}
 				}
 			}
 		}
@@ -535,21 +588,27 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		c.Expression()
 		c.EmitInstr(setOp, idx)
 		data := PopExpressionValue()
-		valType = data.Value
-		objType = data.ObjType
-		if setOp == OP_SET_GLOBAL || setOp == OP_SET_AGLOBAL {
+		if isArray {
+			valType = data.Value
+			objType = VAR_ARRAY
+		} else if isHash {
+			valType = VAL_LIST
+			objType = VAR_HASH
+		} else {
+			valType = data.Value
+			objType = data.ObjType
+		}
+		if isGlobal {
 
-			//fmt.Printf("Init: %v valtype: %v datatype %v\n",GlobalVars[idx].IsInitialized, valType, GlobalVars[idx].datatype)
-
-			if GlobalVars[idx].IsInitialized && valType != GlobalVars[idx].datatype {
-				c.Error("Cannot assign incompatible variable")
-			}
+			//if GlobalVars[idx].IsInitialized && valType != GlobalVars[idx].datatype {
+			//	c.Error("Cannot assign incompatible variable")
+			//}
 
 			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
 
-		} else if setOp == OP_SET_LOCAL || setOp == OP_SET_ALOCAL {
+		} else if isLocal {
 			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].dataType {
 				c.Error("Cannot assign incompatible variable")
 			}
@@ -557,20 +616,20 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			c.Current.Locals[idx].IsInitialized = true
 			c.Current.Locals[idx].dataType = valType
 			c.Current.Locals[idx].objtype = objType
-		} else if setOp == OP_SET_UPVALUE {
+		} else if isUpvalue {
 			c.Current.Upvalues[idx].dataType = valType
 		}
 
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
 	} else {
 		c.EmitInstr(getOp, idx)
-		if getOp == OP_GET_GLOBAL || getOp == OP_GET_AGLOBAL {
+		if isGlobal {
 			valType = GlobalVars[idx].datatype
 			objType = GlobalVars[idx].objtype
-		} else if getOp == OP_GET_LOCAL || getOp == OP_GET_ALOCAL {
+		} else if isLocal {
 			valType = c.Current.Locals[idx].dataType
 			objType = c.Current.Locals[idx].objtype
-		} else if getOp == OP_GET_UPVALUE {
+		} else if isUpvalue {
 			valType = c.Current.Upvalues[idx].dataType
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
@@ -849,6 +908,10 @@ func (c *Compiler) EmitInstr(opcode byte, operand int16) {
 	c.CurrentInstructions().WriteInstruction(opcode, operand, c.Parser.Previous.Line)
 }
 
+func (c *Compiler) EmitSingleByteInstr(opcode byte, operand byte) {
+	c.CurrentInstructions().WriteSingleByteInstruction(opcode, operand, c.Parser.Previous.Line)
+}
+
 func (c *Compiler) EmitReturn() {
 	c.EmitOp(OP_NIL)
 	c.EmitOp(OP_RETURN)
@@ -907,7 +970,20 @@ func (c *Compiler) Grouping(canAssign bool) {
 }
 func (c *Compiler) Call(canAssign bool) {
 	argumentCount := c.GetArguments()
-	c.EmitInstr(OP_CALL, argumentCount)
+
+	switch argumentCount {
+	case 0:
+		c.EmitOp(OP_CALL_0)
+	case 1:
+		c.EmitOp(OP_CALL_1)
+	case 2:
+		c.EmitOp(OP_CALL_2)
+	case 3:
+		c.EmitOp(OP_CALL_0)
+	default:
+		c.EmitInstr(OP_CALL, argumentCount)
+	}
+
 	c.WriteComment(fmt.Sprintf("Function call with %d arguments", argumentCount))
 }
 
@@ -1092,6 +1168,51 @@ func (c *Compiler) Dot(canAssign bool) {
 	}
 }
 
+func (c *Compiler) List(canAssign bool) {
+	keys := int16(0)
+	var keyType ValueType
+	var dType ValueType
+
+	for {
+		// Key
+		c.Expression()
+		expVal := PopExpressionValue().Value
+		if keys == 0 {
+			keyType = expVal
+		}
+		if keyType != expVal {
+			c.Error(fmt.Sprintf("Key %d is incompatible with first key type %s",
+				keys, ValueTypeLabel[dType]))
+		}
+
+		c.Consume(TOKEN_COLON, "Expect ':' after key definition")
+		// Value
+		c.Expression()
+		expVal = PopExpressionValue().Value
+		if keys == 0 {
+			dType = expVal
+		}
+		if dType != expVal {
+			c.Error(fmt.Sprintf("Value %d is incompatible with first value type %s",
+				keys, ValueTypeLabel[dType]))
+		}
+
+		keys++
+		if !c.Match(TOKEN_COMMA) {
+			break
+		}
+	}
+	c.Consume(TOKEN_RIGHT_BRACE, "Expect '}' after list definition")
+	c.EmitInstr(OP_PUSH, keys)
+	c.EmitSingleByteInstr(OP_LIST, byte(keyType))
+	PushExpressionValue(ExpressionData{
+		Value:   VAL_LIST,
+		ObjType: VAR_HASH,
+	})
+
+	c.WriteComment(fmt.Sprintf("List with %d elements type %s=%s", keys, ValueTypeLabel[keyType], ValueTypeLabel[dType]))
+}
+
 func (c *Compiler) Array(canAssign bool) {
 	// Find how many items are in this array
 	elements := int16(0)
@@ -1120,7 +1241,6 @@ func (c *Compiler) Array(canAssign bool) {
 
 }
 func (c *Compiler) Index(canAssign bool) {}
-func (c *Compiler) HMap(canAssign bool)  {}
 func (c *Compiler) Variable(canAssign bool) {
 	c.NamedVariable(canAssign)
 }

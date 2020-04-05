@@ -33,9 +33,10 @@ func (i Instruction) Display() {
 	fmt.Printf("%-15s\t", OpLabel[i.OpCode])
 
 	if i.OperandCount > 0 {
-
 		if i.OpCode == OP_CLOSURE {
 			fmt.Printf("%v", i.Operand)
+		} else if i.OpCode == OP_LIST {
+			fmt.Printf("%d", i.Operand)
 		} else {
 			fmt.Printf("%d", BytesToInt16(i.Operand))
 		}
@@ -91,6 +92,20 @@ func (i *Instructions) WriteInstruction(opcode byte, operand int16, line int) {
 	i.Count++
 	i.BytePosition += 3
 
+}
+
+func (i *Instructions) WriteSingleByteInstruction(opcode byte, operand byte, line int) {
+	instr := Instruction{
+		OpCode:       opcode,
+		Operand:      []byte{operand},
+		OperandCount: 1,
+		ByteCount:    2,
+		Line:         line,
+	}
+	i.OpCode[i.Count] = instr
+	i.OpCode[i.Count].BytePosition = i.BytePosition
+	i.Count++
+	i.BytePosition += 2
 }
 
 func (i *Instructions) WriteSimpleInstruction(opcode byte, line int) {

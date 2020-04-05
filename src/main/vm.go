@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"runtime/debug"
 )
 
 type CallFrame struct {
@@ -82,7 +83,7 @@ func (v *VM) GetOperand() Obj {
 }
 
 func (v *VM) GetByte() byte {
-	val := v.Code[v.Frame.ip+1]
+	val := v.Code[(v.Frame.ip + 1)]
 	v.Frame.ip++
 	return val
 }
@@ -162,9 +163,9 @@ func (v *VM) MethodCall() {
 
 }
 
-func (v *VM) FunctionCall() {
+func (v *VM) FunctionCall(argCount int16) {
 	// Get the parameters
-	argCount := v.GetOperandValue()
+
 	closure := v.Peek(int(argCount)).(*ObjClosure)
 	v.ExecCall(closure, argCount+1)
 }
@@ -190,7 +191,7 @@ func (v *VM) ExecCall(closure *ObjClosure, argCount int16) {
 First call into the VM
  ---------------------------------------*/
 func Exec(source *string, dbgMode bool) {
-
+	debug.SetGCPercent(-1)
 	vm := VM{
 		fp:        0,
 		Stack:     make([]Obj, 1024),
@@ -235,6 +236,7 @@ func (v *VM) Interpret() {
 		v.Frame.ip++
 		opCode = v.Code[v.Frame.ip]
 		if opCode == OP_HALT {
+			fmt.Println("Completed")
 			break
 		}
 		v.Dispatch(opCode)
@@ -446,8 +448,16 @@ func (v *VM) Dispatch(opCode byte) {
 		slot := v.GetOperandValue()
 		v.Push(*v.Frame.Closure.Upvalues[slot].Reference)
 
+	case OP_CALL_0:
+		v.FunctionCall(0)
+	case OP_CALL_1:
+		v.FunctionCall(1)
+	case OP_CALL_2:
+		v.FunctionCall(2)
+	case OP_CALL_3:
+		v.FunctionCall(3)
 	case OP_CALL:
-		v.FunctionCall()
+		v.FunctionCall(v.GetOperandValue())
 
 	case OP_CALL_METHOD:
 		v.MethodCall()
@@ -539,6 +549,35 @@ func (v *VM) Dispatch(opCode byte) {
 		val := -v.Pop().(*ObjFloat).Value
 		v.Push(&ObjFloat{Value: -val})
 
+	case OP_SET_HLOCAL:
+	case OP_GET_HLOCAL:
+		elem := v.Pop()
+		slot := v.GetOperandValue()
+		v.Push(v.Frame.slots[slot].(*ObjList).GetValue(elem))
+
+	case OP_GET_HGLOBAL:
+		index := v.Pop()
+		list := v.Globals[v.GetOperandValue()].(*ObjList)
+		v.Push(list.GetValue(index))
+
+	case OP_SET_HGLOBAL:
+		val := v.Pop()
+		index := v.Pop()
+		oList := v.Globals[v.GetOperandValue()].(*ObjList)
+		oList.SetValue(index, val)
+
+	case OP_GET_GLOBAL_0:
+		v.Push(v.Globals[0])
+	case OP_GET_GLOBAL_1:
+		v.Push(v.Globals[1])
+	case OP_GET_GLOBAL_2:
+		v.Push(v.Globals[2])
+	case OP_GET_GLOBAL_3:
+		v.Push(v.Globals[3])
+	case OP_GET_GLOBAL_4:
+		v.Push(v.Globals[4])
+	case OP_GET_GLOBAL_5:
+		v.Push(v.Globals[5])
 	case OP_GET_GLOBAL:
 		idx := v.GetOperandValue()
 		v.Push(v.Globals[idx])
@@ -551,6 +590,18 @@ func (v *VM) Dispatch(opCode byte) {
 		slot := v.GetOperandValue()
 		v.Frame.slots[slot] = v.Peek(0)
 
+	case OP_GET_LOCAL_0:
+		v.Push(v.Frame.slots[0])
+	case OP_GET_LOCAL_1:
+		v.Push(v.Frame.slots[1])
+	case OP_GET_LOCAL_2:
+		v.Push(v.Frame.slots[2])
+	case OP_GET_LOCAL_3:
+		v.Push(v.Frame.slots[3])
+	case OP_GET_LOCAL_4:
+		v.Push(v.Frame.slots[4])
+	case OP_GET_LOCAL_5:
+		v.Push(v.Frame.slots[5])
 	case OP_GET_LOCAL:
 		slot := v.GetOperandValue()
 		v.Push(v.Frame.slots[slot])
@@ -653,6 +704,21 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(&ObjBool{Value: false})
 
 	case OP_CONTINUE:
+
+	case OP_LIST:
+
+		keyCount := v.Pop().(*ObjInteger).Value
+		keyType := v.GetByte()
+
+		var lObj = new(ObjList)
+		lObj.Init(ValueType(keyType), int(keyCount))
+		for i := int64(0); i < keyCount; i++ {
+			val := v.Pop()
+			key := v.Pop()
+			lObj.AddNew(key, val) // Key, Value
+		}
+		v.Push(lObj)
+
 	case OP_ARRAY:
 		elements := v.Pop().(*ObjInteger).Value
 		dType := byte(v.GetOperandValue())

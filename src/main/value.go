@@ -169,11 +169,27 @@ func (l *ObjList) Init(keyType ValueType, elementCount int) {
 }
 
 func (l *ObjList) GetValue(obj Obj) Obj {
-	return l.List[obj.(HKey).HashValue()]
+	if obj.Type() == VAL_STRING {
+		return l.List[obj.(*ObjString).HashValue()]
+	} else {
+		return nil
+	}
+
 }
 
 func (l *ObjList) AddNew(key Obj, val Obj) {
-	l.List[key.(HKey).HashValue()] = val
+	l.List[key.(*ObjString).HashValue()] = val
+}
+
+func (l ObjList) SetValue(obj Obj, val Obj) {
+	var hVal HashKey
+	switch l.KeyType {
+	case VAL_INTEGER:
+		hVal = obj.(*ObjInteger).HashValue()
+	case VAL_STRING:
+		hVal = obj.(*ObjString).HashValue()
+	}
+	l.List[hVal] = val
 }
 
 // Upvalue functions
