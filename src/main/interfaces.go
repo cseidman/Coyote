@@ -66,6 +66,7 @@ const (
 	TYPE_FUNCTION FunctionType = iota
 	TYPE_SCRIPT
 	TYPE_METHOD
+	TYPE_NATIVE
 )
 
 type AccessorType byte

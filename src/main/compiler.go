@@ -201,9 +201,8 @@ var registers = make([]register, 256)
 type Compiler struct {
 	Current *FunctionVar
 
-	Parser *Parser
-	Rules  []ParseRule
-
+	Parser     *Parser
+	Rules      []ParseRule
 	registers  []register
 	ScopeDepth int
 	DebugMode  bool
@@ -216,6 +215,9 @@ func Compile(source *string, dbgMode bool) *ObjFunction {
 
 	compiler := NewCompiler(&parser)
 	compiler.DebugMode = dbgMode
+
+	// Global function store
+	RegisterFunctions()
 
 	compiler.Advance()
 	for !compiler.Match(TOKEN_EOF) {
@@ -468,14 +470,20 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 		return uix, exprValue
 	}
 	return -1, nil
-
 }
 
 func (c *Compiler) NamedVariable(canAssign bool) {
 
-	objType := VAR_SCALAR
-
 	tok := c.Parser.Previous
+
+	// Above all, check to see if this name is a built-in function
+	nativeFunction := ResolveNativeFunction(tok.ToString())
+	if nativeFunction != nil {
+		c.CallNative(nativeFunction)
+		return
+	}
+
+	objType := VAR_SCALAR
 
 	var getOp byte
 	var setOp byte
@@ -488,6 +496,8 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	hasIndex := false
 	isArray := false
 	isHash := false
+
+	isHasOperand := false
 
 	// Get the index value and pop it on to the stack
 	if c.Match(TOKEN_LEFT_BRACKET) {
@@ -507,10 +517,12 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			getOp = OP_GET_ALOCAL
 			setOp = OP_SET_ALOCAL
 			isArray = true
+			isHasOperand = true
 		} else if exprValue.ObjType == VAR_HASH && hasIndex {
 			getOp = OP_GET_HLOCAL
 			setOp = OP_SET_HLOCAL
 			isHash = true
+			isHasOperand = true
 		} else {
 			switch idx {
 			case 0:
@@ -527,6 +539,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 				getOp = OP_GET_LOCAL_5
 			default:
 				getOp = OP_GET_LOCAL
+				isHasOperand = true
 			}
 			setOp = OP_SET_LOCAL
 		}
@@ -535,6 +548,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		isUpvalue = true
 		getOp = OP_GET_UPVALUE
 		setOp = OP_SET_UPVALUE
+		isHasOperand = true
 
 	} else {
 
@@ -545,6 +559,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			getOp = OP_GET_REGISTER
 			setOp = OP_SET_REGISTER
 			valType = VAL_INTEGER
+			isHasOperand = true
 		} else {
 			isGlobal = true
 			idx, exprValue = c.ResolveGlobal(&tok)
@@ -554,12 +569,14 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 					getOp = OP_GET_AGLOBAL
 				}
 				isArray = true
+				isHasOperand = true
 			} else if exprValue.ObjType == VAR_HASH && hasIndex {
 				setOp = OP_SET_HGLOBAL
 				if idx != -1 {
 					getOp = OP_GET_HGLOBAL
 				}
 				isHash = true
+				isHasOperand = true
 			} else {
 				setOp = OP_SET_GLOBAL
 				if idx != -1 {
@@ -578,6 +595,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 						getOp = OP_GET_GLOBAL_5
 					default:
 						getOp = OP_GET_GLOBAL
+						isHasOperand = true
 					}
 				}
 			}
@@ -585,8 +603,14 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	}
 
 	if canAssign && c.Match(TOKEN_EQUAL) {
+
 		c.Expression()
-		c.EmitInstr(setOp, idx)
+		if isHasOperand {
+			c.EmitInstr(setOp, idx)
+		} else {
+			c.EmitOp(setOp)
+		}
+
 		data := PopExpressionValue()
 		if isArray {
 			valType = data.Value
@@ -599,10 +623,6 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			objType = data.ObjType
 		}
 		if isGlobal {
-
-			//if GlobalVars[idx].IsInitialized && valType != GlobalVars[idx].datatype {
-			//	c.Error("Cannot assign incompatible variable")
-			//}
 
 			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
@@ -622,7 +642,11 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
 	} else {
-		c.EmitInstr(getOp, idx)
+		if isHasOperand {
+			c.EmitInstr(getOp, idx)
+		} else {
+			c.EmitOp(getOp)
+		}
 		if isGlobal {
 			valType = GlobalVars[idx].datatype
 			objType = GlobalVars[idx].objtype
@@ -731,6 +755,11 @@ func (c *Compiler) DeclareVariable() {
 
 	// Store the token here
 	tok := c.Parser.Previous
+
+	// Error if this variable collides with an existing native function name
+	if ResolveNativeFunction(tok.ToString()) != nil {
+		c.Error(fmt.Sprintf("'%s' is a reserved name", tok.ToString()))
+	}
 
 	var index int16
 	var opcode byte
@@ -1772,6 +1801,14 @@ func (c *Compiler) Method(canAssign bool) {
 
 func (c *Compiler) Function(canAssign bool) {
 	c.Procedure(TYPE_FUNCTION)
+}
+
+func (c *Compiler) CallNative(nativeFunction *ObjNative) {
+	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' before native call")
+	argumentCount := c.GetArguments()
+	idx := c.MakeConstant(nativeFunction)
+	c.EmitInstr(OP_CALL_NATIVE, idx)
+	c.EmitOperand(argumentCount)
 }
 
 func (c *Compiler) Procedure(functionType FunctionType) {

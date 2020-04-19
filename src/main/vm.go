@@ -28,10 +28,11 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	Registers    []int64
-	ObjRegister  []Obj
-	OpenUpvalues *ObjUpvalue
-	DebugMode    bool
+	FunctionRegister map[string]*ObjNative
+	Registers        []int64
+	ObjRegister      []Obj
+	OpenUpvalues     *ObjUpvalue
+	DebugMode        bool
 }
 
 func (v *VM) GetByteCode() *[]byte {
@@ -138,29 +139,44 @@ func (v *VM) CloseUpvalues(last *Obj, objIndex int) {
 	}
 }
 
+func (v *VM) CallNative() {
+	native := *v.GetOperand().(*ObjNative).Function
+	argCount := int(v.GetOperandValue())
+	result := native(v, argCount, v.sp-argCount)
+	v.sp += argCount
+	v.Push(result)
+}
+
 func (v *VM) MethodCall() {
 
 	classInst := v.Pop().(*ObjClass)
 	idx := v.GetOperand().(*ObjString).Value
-	closure := classInst.Fields[idx].(*ObjClosure)
-
 	argCount := v.GetOperandValue()
 
-	// Push the code into this new frame
-	v.Frame = &v.Frames[v.fp]
-	v.Frame.ip = -1
-	v.fp++
+	fld := classInst.Fields[idx]
+	if fld.Type() == VAL_NATIVE {
+		native := classInst.Fields[idx].(ObjNative).Function
+		result := (*native)(v, int(argCount), v.sp-int(argCount))
+		v.sp += int(argCount)
+		v.Push(result)
+	} else {
+		closure := classInst.Fields[idx].(*ObjClosure)
 
-	v.Frame.Closure = closure
-	// Reference to the code block
-	v.Code = v.Frame.Closure.Function.Code.Code[:]
-	// This frame's slots line up with the stacks at the point where
-	// the function and the parameters begin on the stack
-	start := v.sp - int(argCount)
+		// Push the code into this new frame
+		v.Frame = &v.Frames[v.fp]
+		v.Frame.ip = -1
+		v.fp++
 
-	v.Frame.slots = v.Stack[start:]
-	v.Frame.slotptr = start + 1
+		v.Frame.Closure = closure
+		// Reference to the code block
+		v.Code = v.Frame.Closure.Function.Code.Code[:]
+		// This frame's slots line up with the stacks at the point where
+		// the function and the parameters begin on the stack
+		start := v.sp - int(argCount)
 
+		v.Frame.slots = v.Stack[start:]
+		v.Frame.slotptr = start + 1
+	}
 }
 
 func (v *VM) FunctionCall(argCount int16) {
@@ -200,7 +216,6 @@ func Exec(source *string, dbgMode bool) {
 		Frames:    make([]CallFrame, 1024),
 		DebugMode: dbgMode,
 	}
-
 	fn := Compile(source, dbgMode)
 
 	if fn == nil {
@@ -472,6 +487,9 @@ func (v *VM) Dispatch(opCode byte) {
 		idx := v.GetOperand().(*ObjString).Value
 		v.Push(classInst.Fields[idx])
 
+	case OP_CALL_NATIVE:
+		v.CallNative()
+
 	case OP_ICONST, OP_FCONST, OP_SCONST, OP_FN_CONST:
 		v.Push(v.GetOperand())
 
@@ -564,6 +582,7 @@ func (v *VM) Dispatch(opCode byte) {
 		val := v.Pop()
 		index := v.Pop()
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
+		v.Push(oList)
 		oList.SetValue(index, val)
 
 	case OP_GET_GLOBAL_0:
