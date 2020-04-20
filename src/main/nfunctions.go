@@ -45,12 +45,9 @@ var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 	}
 
 	var fnFread NativeFn = func(vm *VM, args int, argpos int) Obj {
-
 		file, _ := ioutil.ReadFile(fileName)
-
 		return ObjString{Value: string(file)}
 	}
-
 	class.Fields["read"] = FuncToNative(&fnFread)
 
 	return class
