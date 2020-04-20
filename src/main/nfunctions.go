@@ -54,24 +54,8 @@ var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 	// read(<start:int>, <bytes:int>) returns []bytes
 
 	var fnFread NativeFn = func(vm *VM, args int, argpos int) Obj {
-
-		byteCount := int64(vm.Pop().(ObjInteger))
-		startFrom := int64(vm.Pop().(ObjInteger))
-
-		b := make([]byte, byteCount)
-		_, err := file.ReadAt(b, startFrom)
-		if err != nil {
-			log.Panicf("Error reading file '%s'", fileName)
-		}
-		arObj := make([]Obj, byteCount)
-		for i := int64(0); i < byteCount; i++ {
-			arObj[byteCount-i-1] = oByte(b[i])
-		}
-		return ObjArray{
-			ElementCount: int(byteCount),
-			ElementTypes: VAL_BYTE,
-			Elements:     arObj,
-		}
+		file, _ := ioutil.ReadFile(fileName)
+		return ObjString{Value: string(file)}
 	}
 	class.Fields["read"] = FuncToNative(&fnFread)
 
