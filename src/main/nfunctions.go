@@ -2,6 +2,8 @@ package main
 
 import (
 	"io/ioutil"
+	"log"
+	"os"
 )
 
 var FunctionRegister = make(map[string]*ObjNative)
@@ -35,20 +37,52 @@ var AddIt NativeFn = func(vm *VM, args int, argpos int) Obj {
 
 var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 	fileName := vm.Pop().(*ObjString).Value
-	//file,err := os.Open(fileName)
-	//if err !=nil {
-	//	log.Panicf("Error opening file '%s'",fileName)
-	//}
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Panicf("Error opening file '%s'", fileName)
+	}
 
 	class := &ObjClass{
 		Fields: make(map[string]Obj),
 	}
+	// Load some properties
+	class.Fields["position"] = &ObjInteger{Value: 0}
+
+	// Build the native methods here ************************
+
+	// read(<start:int>, <bytes:int>) returns []bytes
 
 	var fnFread NativeFn = func(vm *VM, args int, argpos int) Obj {
-		file, _ := ioutil.ReadFile(fileName)
-		return ObjString{Value: string(file)}
+
+		byteCount := vm.Pop().(*ObjInteger).Value
+		startFrom := vm.Pop().(*ObjInteger).Value
+
+		b := make([]byte, byteCount)
+		_, err := file.ReadAt(b, startFrom)
+		if err != nil {
+			log.Panicf("Error reading file '%s'", fileName)
+		}
+		arObj := make([]ObjByte, byteCount)
+		for i := int64(0); i < byteCount; i++ {
+			arObj[i] = ObjByte{b[i]}
+		}
+		return ObjArray{
+			ElementCount: int(byteCount),
+			ElementTypes: VAL_BYTE,
+			Elements:     arObj,
+		}
 	}
 	class.Fields["read"] = FuncToNative(&fnFread)
+
+	// readall: Returns the full contents of the file
+	var fnFreadAll NativeFn = func(vm *VM, args int, argpos int) Obj {
+		file, err := ioutil.ReadFile(file.Name())
+		if err != nil {
+			log.Panicf("Error reading file '%s'", fileName)
+		}
+		return ObjString{Value: string(file)}
+	}
+	class.Fields["readall"] = FuncToNative(&fnFreadAll)
 
 	return class
 
