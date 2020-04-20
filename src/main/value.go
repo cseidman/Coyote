@@ -279,7 +279,7 @@ func (i ObjInteger) ShowValue() string { return fmt.Sprintf("%d", i.Value) }
 func (i ObjInteger) Type() ValueType   { return VAL_INTEGER }
 func (i ObjInteger) ToBytes() []byte   { return Int64ToBytes(i.Value) }
 
-func (i *ObjInteger) HashValue() HashKey {
+func (i ObjInteger) HashValue() HashKey {
 	return HashKey{
 		Type:      VAL_INTEGER,
 		HashValue: uint64(i.Value),
@@ -363,10 +363,10 @@ func (a ObjArray) Init(v ValueType, e int) {
 }
 
 // Iterator interface
-func (a *ObjArray) Count() int {
+func (a ObjArray) Count() int {
 	return a.ElementCount
 }
-func (a *ObjArray) Next() Obj {
+func (a ObjArray) Next() Obj {
 	a.ElementCount++
 	return a.Elements[a.ElementCount-1]
 }
