@@ -1122,11 +1122,15 @@ func (c *Compiler) Binary(canAssign bool) {
 		c.EmitOp(OP_LESS_EQUAL)
 		PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: data.ObjType})
 	case TOKEN_PLUS:
-		if data.Value == VAL_INTEGER {
+		switch data.Value {
+		case VAL_INTEGER:
 			c.EmitOp(OP_IADD)
 			PushExpressionValue(data)
-		} else if data.Value == VAL_FLOAT {
+		case VAL_FLOAT:
 			c.EmitOp(OP_FADD)
+			PushExpressionValue(data)
+		case VAL_STRING:
+			c.EmitOp(OP_SADD)
 			PushExpressionValue(data)
 		}
 	case TOKEN_MINUS:
@@ -1288,14 +1292,14 @@ func (c *Compiler) String(canAssign bool) {
 }
 func (c *Compiler) Integer(canAssign bool) {
 	value, _ := strconv.ParseInt(string(c.Parser.Previous.Value), 10, 64)
-	idx := c.MakeConstant(&ObjInteger{Value: value})
+	idx := c.MakeConstant(ObjInteger(value))
 	c.EmitInstr(OP_ICONST, idx)
 	c.WriteComment(fmt.Sprintf("Value %d at constant index %d", value, idx))
 	PushExpressionValue(ExpressionData{Value: VAL_INTEGER, ObjType: VAR_SCALAR})
 }
 func (c *Compiler) Float(canAssign bool) {
 	value, _ := strconv.ParseFloat(string(c.Parser.Previous.Value), 64)
-	idx := c.MakeConstant(&ObjFloat{Value: value})
+	idx := c.MakeConstant(ObjFloat(value))
 	c.EmitInstr(OP_FCONST, idx)
 	PushExpressionValue(ExpressionData{Value: VAL_FLOAT, ObjType: VAR_SCALAR})
 

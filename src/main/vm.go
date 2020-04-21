@@ -149,9 +149,9 @@ func (v *VM) CallNative() {
 
 func (v *VM) MethodCall() {
 
-	classInst := v.Pop().(*ObjClass)
 	idx := v.GetOperand().(*ObjString).Value
-	argCount := v.GetOperandValue()
+	argCount := int(v.GetOperandValue())
+	classInst := v.Peek(argCount).(*ObjClass)
 
 	fld := classInst.Fields[idx]
 	if fld.Type() == VAL_NATIVE {
@@ -177,6 +177,7 @@ func (v *VM) MethodCall() {
 		v.Frame.slots = v.Stack[start:]
 		v.Frame.slotptr = start + 1
 	}
+
 }
 
 func (v *VM) FunctionCall(argCount int16) {
@@ -274,8 +275,8 @@ func (v *VM) ScanArray() {
 
 	bytes := int(v.GetOperandValue())
 
-	localIndex := v.Pop().(*ObjInteger).Value
-	counterReg := v.Pop().(*ObjInteger).Value
+	localIndex := int64(*v.Pop().(*ObjInteger))
+	counterReg := int64(*v.Pop().(*ObjInteger))
 
 	// Initialize the register
 	v.Registers[counterReg] = 0
@@ -314,12 +315,12 @@ mainLoop:
 // This handles the FOR loop
 func (v *VM) ForLoop() {
 
-	fromReg := int(v.Pop().(*ObjInteger).Value)
+	fromReg := int(int64(*v.Pop().(*ObjInteger)))
 	bytes := int(v.GetOperandValue())
 
-	step := v.Pop().(*ObjInteger).Value
-	to := v.Pop().(*ObjInteger).Value
-	fromVal := v.Pop().(*ObjInteger).Value
+	step := int64(*v.Pop().(*ObjInteger))
+	to := int64(*v.Pop().(*ObjInteger))
+	fromVal := int64(*v.Pop().(*ObjInteger))
 	// We're positioned at the current instruction
 	startIp := v.Frame.ip
 	stackPtr := v.sp
@@ -494,61 +495,61 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(v.GetOperand())
 
 	case OP_PUSH:
-		v.Push(&ObjInteger{int64(v.GetOperandValue())})
+		v.Push(ObjInteger(v.GetOperandValue()))
 
 	case OP_PUSH_0:
-		v.Push(&ObjInteger{0})
+		v.Push(ObjInteger(0))
 
 	case OP_PUSH_1:
-		v.Push(&ObjInteger{1})
+		v.Push(ObjInteger(1))
 
 	case OP_IADD:
 
-		rval := v.Pop().(*ObjInteger).Value
-		lval := v.Pop().(*ObjInteger).Value
+		rval := v.Pop().(ObjInteger)
+		lval := v.Pop().(ObjInteger)
 
-		v.Push(&ObjInteger{Value: rval + lval})
+		v.Push(rval + lval)
 
 	case OP_FADD:
-		rval := v.Pop().(*ObjFloat).Value
-		lval := v.Pop().(*ObjFloat).Value
+		rval := v.Pop().(ObjFloat)
+		lval := v.Pop().(ObjFloat)
 
-		v.Push(&ObjFloat{Value: rval + lval})
+		v.Push(rval + lval)
 	case OP_SADD:
 		rval := v.Pop().(*ObjString).Value
 		lval := v.Pop().(*ObjString).Value
 
-		v.Push(&ObjString{Value: rval + lval})
+		v.Push(&ObjString{Value: lval + rval})
 	case OP_ISUBTRACT:
-		rval := v.Pop().(*ObjInteger).Value
-		lval := v.Pop().(*ObjInteger).Value
+		rval := v.Pop().(ObjInteger)
+		lval := v.Pop().(ObjInteger)
 
-		v.Push(&ObjInteger{Value: lval - rval})
+		v.Push(lval - rval)
 	case OP_FSUBTRACT:
-		rval := v.Pop().(*ObjFloat).Value
-		lval := v.Pop().(*ObjFloat).Value
+		rval := v.Pop().(ObjFloat)
+		lval := v.Pop().(ObjFloat)
 
-		v.Push(&ObjFloat{Value: lval - rval})
+		v.Push(lval - rval)
 	case OP_IMULTIPLY:
-		rval := v.Pop().(*ObjInteger).Value
-		lval := v.Pop().(*ObjInteger).Value
+		rval := int64(*v.Pop().(*ObjInteger))
+		lval := int64(*v.Pop().(*ObjInteger))
 
-		v.Push(&ObjInteger{Value: rval * lval})
+		v.Push(ObjInteger(rval * lval))
 	case OP_FMULTIPLY:
-		rval := v.Pop().(*ObjFloat).Value
-		lval := v.Pop().(*ObjFloat).Value
+		rval := v.Pop().(ObjFloat)
+		lval := v.Pop().(ObjFloat)
 
-		v.Push(&ObjFloat{Value: rval * lval})
+		v.Push(rval * lval)
 	case OP_IDIVIDE:
-		rval := v.Pop().(*ObjInteger).Value
-		lval := v.Pop().(*ObjInteger).Value
+		rval := int64(*v.Pop().(*ObjInteger))
+		lval := int64(*v.Pop().(*ObjInteger))
 
-		v.Push(&ObjInteger{Value: lval / rval})
+		v.Push(ObjInteger(lval / rval))
 	case OP_FDIVIDE:
-		rval := v.Pop().(*ObjFloat).Value
-		lval := v.Pop().(*ObjFloat).Value
+		rval := v.Pop().(ObjFloat)
+		lval := v.Pop().(ObjFloat)
 
-		v.Push(&ObjFloat{Value: lval / rval})
+		v.Push(lval / rval)
 	case OP_NIL:
 		v.Push(&NULL{})
 	case OP_INCREMENT:
@@ -560,12 +561,12 @@ func (v *VM) Dispatch(opCode byte) {
 		//v.Push(val)
 
 	case OP_INEGATE:
-		val := -v.Pop().(*ObjInteger).Value
-		v.Push(&ObjInteger{Value: -val})
+		val := -int64(*v.Pop().(*ObjInteger))
+		v.Push(ObjInteger(-val))
 
 	case OP_FNEGATE:
-		val := -v.Pop().(*ObjFloat).Value
-		v.Push(&ObjFloat{Value: -val})
+		val := -v.Pop().(ObjFloat)
+		v.Push(-val)
 
 	case OP_SET_HLOCAL:
 	case OP_GET_HLOCAL:
@@ -627,32 +628,32 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_REGISTER:
 		idx := v.GetOperandValue()
-		v.Registers[idx] = v.Peek(0).(*ObjInteger).Value
+		v.Registers[idx] = int64(*v.Peek(0).(*ObjInteger))
 
 	case OP_GET_REGISTER:
 		idx := v.GetOperandValue()
-		v.Push(&ObjInteger{Value: v.Registers[idx]})
+		v.Push(ObjInteger(v.Registers[idx]))
 
 	case OP_GET_ALOCAL:
-		elem := v.Pop().(*ObjInteger).Value
+		elem := int64(*v.Pop().(*ObjInteger))
 		slot := v.GetOperandValue()
 		v.Push(v.Frame.slots[slot].(*ObjArray).Elements[elem])
 
 	case OP_SET_ALOCAL:
 		slot := v.GetOperandValue()
 		val := v.Peek(0)
-		elem := v.Pop().(*ObjInteger).Value
+		elem := int64(*v.Pop().(*ObjInteger))
 		v.Stack[slot].(*ObjArray).Elements[elem] = val
 
 	case OP_GET_AGLOBAL:
-		elem := v.Pop().(*ObjInteger).Value
+		elem := int64(*v.Pop().(*ObjInteger))
 		idx := v.GetOperandValue()
 		v.Push(v.Globals[idx].(*ObjArray).Elements[elem])
 
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()
 		val := v.Pop()
-		elem := int(v.Peek(0).(*ObjInteger).Value)
+		elem := int(*v.Peek(0).(*ObjInteger))
 		v.Globals[idx].(*ObjArray).Elements[elem] = val
 
 	case OP_POP:
@@ -705,16 +706,16 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(&ObjBool{Value: bytes.Equal(rval, lval)})
 
 	case OP_IEXP:
-		pwr := v.Pop().(*ObjInteger).Value
-		lval := v.Pop().(*ObjInteger).Value
+		pwr := int64(*v.Pop().(*ObjInteger))
+		lval := int64(*v.Pop().(*ObjInteger))
 
-		v.Push(&ObjInteger{Value: int64(math.Pow(float64(lval), float64(pwr)))})
+		v.Push(ObjInteger(int64(math.Pow(float64(lval), float64(pwr)))))
 
 	case OP_FEXP:
-		pwr := v.Pop().(*ObjFloat).Value
-		lval := v.Pop().(*ObjFloat).Value
+		pwr := float64(v.Pop().(ObjFloat))
+		lval := float64(v.Pop().(ObjFloat))
 
-		v.Push(&ObjFloat{Value: math.Pow(lval, pwr)})
+		v.Push(ObjFloat(math.Pow(lval, pwr)))
 
 	case OP_TRUE:
 		v.Push(&ObjBool{Value: true})
@@ -726,7 +727,7 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_LIST:
 
-		keyCount := v.Pop().(*ObjInteger).Value
+		keyCount := int64(*v.Pop().(*ObjInteger))
 		keyType := v.GetByte()
 
 		var lObj = new(ObjList)
@@ -739,7 +740,7 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(lObj)
 
 	case OP_ARRAY:
-		elements := v.Pop().(*ObjInteger).Value
+		elements := *v.Pop().(*ObjInteger)
 		dType := byte(v.GetOperandValue())
 
 		o := make([]Obj, elements)
@@ -756,13 +757,13 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_ASIZE:
 		array := v.Peek(1).(*ObjArray)
-		v.Push(&ObjInteger{Value: int64(array.ElementCount)})
+		v.Push(ObjInteger(int64(array.ElementCount)))
 
 	case OP_AINDEX:
-		index := v.Peek(0).(*ObjInteger).Value
+		index := v.Peek(0).(*ObjInteger)
 		array := v.Peek(1).(*ObjArray)
 
-		v.Push(array.Elements[index])
+		v.Push(array.Elements[int64(*index)])
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

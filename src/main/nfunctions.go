@@ -30,9 +30,10 @@ func FuncToNative(fn *NativeFn) ObjNative {
 
 // Function definitions ************************
 var AddIt NativeFn = func(vm *VM, args int, argpos int) Obj {
-	y := vm.Pop().(*ObjInteger).Value
-	x := vm.Pop().(*ObjInteger).Value
-	return ObjInteger{x + y}
+	y := vm.Pop().(ObjInteger)
+	x := vm.Pop().(ObjInteger)
+
+	return x + y
 }
 
 var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
@@ -46,7 +47,7 @@ var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 		Fields: make(map[string]Obj),
 	}
 	// Load some properties
-	class.Fields["position"] = &ObjInteger{Value: 0}
+	class.Fields["position"] = ObjInteger(0)
 
 	// Build the native methods here ************************
 
@@ -54,17 +55,17 @@ var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 
 	var fnFread NativeFn = func(vm *VM, args int, argpos int) Obj {
 
-		byteCount := vm.Pop().(*ObjInteger).Value
-		startFrom := vm.Pop().(*ObjInteger).Value
+		byteCount := int64(vm.Pop().(ObjInteger))
+		startFrom := int64(vm.Pop().(ObjInteger))
 
 		b := make([]byte, byteCount)
 		_, err := file.ReadAt(b, startFrom)
 		if err != nil {
 			log.Panicf("Error reading file '%s'", fileName)
 		}
-		arObj := make([]ObjByte, byteCount)
+		arObj := make([]Obj, byteCount)
 		for i := int64(0); i < byteCount; i++ {
-			arObj[i] = ObjByte{b[i]}
+			arObj[byteCount-i-1] = oByte(b[i])
 		}
 		return ObjArray{
 			ElementCount: int(byteCount),
