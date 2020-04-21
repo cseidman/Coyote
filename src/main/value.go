@@ -27,14 +27,20 @@ type ObjColumnDef struct {
 	Ordinal    byte
 }
 
+type oByte byte
+
+func (o oByte) ShowValue() string { return string(o) }
+func (o oByte) Type() ValueType   { return VAL_BYTE }
+func (o oByte) ToBytes() []byte   { return []byte{byte(o)} }
+
 // Interface types
 func (c ObjColumnDef) ShowValue() string { return fmt.Sprintf("%s", c.ColumnName) }
 func (c ObjColumnDef) Type() ValueType   { return VAL_COLUMN_DEF }
 func (c ObjColumnDef) ToBytes() []byte   { return nil }
 
 // User types
-type ObjInteger struct{ Value int64 }
-type ObjFloat struct{ Value float64 }
+type ObjInteger int64
+type ObjFloat float64 //struct{ Value float64 }
 type ObjString struct{ Value string }
 type ObjBool struct{ Value bool }
 type ObjByte struct{ Value byte }
@@ -275,30 +281,27 @@ func (n NULL) Type() ValueType   { return VAL_NIL }
 func (n NULL) ToBytes() []byte   { return nil }
 
 // Integer functions
-func (i ObjInteger) ShowValue() string { return fmt.Sprintf("%d", i.Value) }
+func (i ObjInteger) ShowValue() string { return fmt.Sprintf("%d", i) }
 func (i ObjInteger) Type() ValueType   { return VAL_INTEGER }
-func (i ObjInteger) ToBytes() []byte   { return Int64ToBytes(i.Value) }
+func (i ObjInteger) ToBytes() []byte   { return Int64ToBytes(int64(i)) }
 
 func (i ObjInteger) HashValue() HashKey {
 	return HashKey{
 		Type:      VAL_INTEGER,
-		HashValue: uint64(i.Value),
+		HashValue: uint64(i),
 	}
 }
 
 // Float functions
-func (f ObjFloat) ShowValue() string { return fmt.Sprintf("%f", f.Value) }
+func (f ObjFloat) ShowValue() string { return fmt.Sprintf("%f", f) }
 func (f ObjFloat) Type() ValueType   { return VAL_FLOAT }
-func (f ObjFloat) ToBytes() []byte   { return Float64ToBytes(f.Value) }
+func (f ObjFloat) ToBytes() []byte   { return Float64ToBytes(float64(f)) }
 
 func (f *ObjFloat) HashValue() HashKey {
 	return HashKey{
 		Type:      VAL_FLOAT,
-		HashValue: uint64(f.Value),
+		HashValue: uint64(float64(*f)),
 	}
-}
-func (f *ObjFloat) Add(oFloat *ObjFloat) *ObjFloat {
-	return &ObjFloat{f.Value + oFloat.Value}
 }
 
 // String functions
