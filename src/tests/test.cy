@@ -1,10 +1,8 @@
-var f = OpenFile("c:\dump\test.txt")
-print f.read(0,5)
-
 var tt = class {
-    multi:int
+    private multi:int
     Sumit = function(x:int,y:int) int {
-        return (x+y(=)
+        return (x+y)*this.multi
     }
 }
+tt.multi = 2
 print tt.Sumit(7,8)

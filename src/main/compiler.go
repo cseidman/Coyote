@@ -251,11 +251,8 @@ func NewCompiler(parser *Parser) *Compiler {
 	var compiler Compiler
 
 	compiler.Parser = parser
-
 	compiler.Init()
-
 	compiler.LoadRules()
-
 	return &compiler
 }
 
@@ -1705,7 +1702,6 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 	c.AddProperty(class, pName)
 
 	if c.Match(TOKEN_EQUAL) {
-		//c.Consume(TOKEN_METHOD,"Expecting 'method' declaration")
 		c.Expression()
 		c.EmitInstr(OP_BIND_PROPERTY, cIdx)
 	} else {
@@ -1836,11 +1832,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	c.Current.Locals[c.Current.LocalCount].depth = 0
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
 
-	if functionType == TYPE_METHOD {
-		c.Current.Locals[c.Current.LocalCount].name = ""
-	} else {
-		c.Current.Locals[c.Current.LocalCount].name = ""
-	}
+	c.Current.Locals[c.Current.LocalCount].name = "this"
 
 	// Set up the locals for this function
 	c.Current.LocalCount++
@@ -1853,11 +1845,12 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	// Here we just count the parameters
 
 	// if it's a method, we add the current class as a parameter
-	if functionType == TYPE_METHOD {
+	if functionType == TYPE_METHOD || functionType == TYPE_FUNCTION {
 		index := c.AddLocal("this")
 		c.Current.Locals[index].dataType = VAL_CLASS
 		paramCount++
 	}
+
 	if !c.Check(TOKEN_RIGHT_PAREN) {
 		for {
 			paramCount++
