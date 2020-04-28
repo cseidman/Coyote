@@ -148,10 +148,9 @@ func (v *VM) CallNative() {
 }
 
 func (v *VM) MethodCall() {
-
-	idx := v.GetOperand().(*ObjString).Value
-	argCount := int(v.GetOperandValue())
-	classInst := v.Peek(argCount).(*ObjClass)
+	idx := v.GetOperand().(*ObjString).Value  // Index of the function variable
+	argCount := int(v.GetOperandValue())      // Number of arguments
+	classInst := v.Peek(argCount).(*ObjClass) // The class
 
 	fld := classInst.Fields[idx]
 	if fld.Type() == VAL_NATIVE {
@@ -172,7 +171,7 @@ func (v *VM) MethodCall() {
 		v.Code = v.Frame.Closure.Function.Code.Code[:]
 		// This frame's slots line up with the stacks at the point where
 		// the function and the parameters begin on the stack
-		start := v.sp - int(argCount)
+		start := v.sp - int(argCount) - 1
 
 		v.Frame.slots = v.Stack[start:]
 		v.Frame.slotptr = start + 1
@@ -531,8 +530,8 @@ func (v *VM) Dispatch(opCode byte) {
 
 		v.Push(lval - rval)
 	case OP_IMULTIPLY:
-		rval := int64(*v.Pop().(*ObjInteger))
-		lval := int64(*v.Pop().(*ObjInteger))
+		rval := int64(v.Pop().(ObjInteger))
+		lval := int64(v.Pop().(ObjInteger))
 
 		v.Push(ObjInteger(rval * lval))
 	case OP_FMULTIPLY:
