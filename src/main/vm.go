@@ -150,7 +150,7 @@ func (v *VM) CallNative() {
 func (v *VM) MethodCall() {
 
 	idx := v.GetOperand().(*ObjString).Value
-	argCount := int(v.GetOperandValue())
+	argCount := int(v.GetOperandValue()) - 1
 	classInst := v.Peek(argCount).(*ObjClass)
 
 	fld := classInst.Fields[idx]
@@ -349,7 +349,7 @@ mainLoop:
 }
 
 func (v *VM) DebugInfo(opCode byte) {
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 12; i++ {
 		// Loop over the slots of the current frame
 		if i >= v.sp {
 			// If there are less than 5 elements in the stack then just print blanks

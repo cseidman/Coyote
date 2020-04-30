@@ -367,6 +367,7 @@ func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) (int16, *Expressio
 			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
+			fmt.Printf("Resolved %s at %d\n", name, i)
 			return i, &ExpressionData{Value: fn.Locals[i].dataType, ObjType: fn.Locals[i].objtype}
 		}
 	}
@@ -1898,27 +1899,27 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 	c.BeginScope()
 
+	paramCount := int16(0)
+
 	c.Current.Locals[c.Current.LocalCount].depth = 0
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
 
-	c.Current.Locals[c.Current.LocalCount].name = "this"
+	// if it's a method, we add the current class as a parameter
+	if functionType == TYPE_METHOD {
+		c.Current.Locals[c.Current.LocalCount].name = "this"
+		c.Current.Locals[c.Current.LocalCount].dataType = VAL_CLASS
+		c.Current.Locals[c.Current.LocalCount].objtype = VAR_CLASS
+		c.Current.Locals[c.Current.LocalCount].Class = CurrentClass
+		paramCount++
+	}
 
 	// Set up the locals for this function
 	c.Current.LocalCount++
-
-	paramCount := int16(0)
 
 	// Parenthesis and parameter definition
 
 	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after function definition.")
 	// Here we just count the parameters
-
-	// if it's a method, we add the current class as a parameter
-	if functionType == TYPE_METHOD || functionType == TYPE_FUNCTION {
-		index := c.AddLocal("this")
-		c.Current.Locals[index].dataType = VAL_CLASS
-		paramCount++
-	}
 
 	if !c.Check(TOKEN_RIGHT_PAREN) {
 		for {
