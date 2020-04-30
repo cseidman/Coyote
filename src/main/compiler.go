@@ -1698,15 +1698,8 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 
 	// Name of the property
 	pName := c.Parser.Previous.ToString()
-	cIdx := c.MakeConstant(&ObjString{pName})
 	c.AddProperty(class, pName)
 
-	if c.Match(TOKEN_EQUAL) {
-		c.Expression()
-		c.EmitInstr(OP_BIND_PROPERTY, cIdx)
-	} else {
-		//c.EmitOp(OP_NIL)
-	}
 }
 
 func (c *Compiler) AddProperty(class *ClassVar, name string) {
@@ -1767,14 +1760,6 @@ func (c *Compiler) Class(canAssign bool) {
 
 	ClassId++
 	vclass.Id = ClassId
-
-	// Inherit from this class
-	if c.Match(TOKEN_AS) {
-		c.Consume(TOKEN_IDENTIFIER, "Expect a class variable name")
-		c.EmitOp(OP_SUBCLASS)
-	} else {
-		c.EmitOp(OP_NIL)
-	}
 
 	c.EmitOp(OP_CLASS)
 	PushExpressionValue(ExpressionData{
