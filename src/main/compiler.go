@@ -1770,6 +1770,7 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 
 	// Name of the property
 	pName := c.Parser.Previous.ToString()
+	// Use this to set the property
 	idx := c.MakeConstant(&ObjString{pName})
 	c.AddProperty(class, pName)
 
