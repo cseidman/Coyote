@@ -641,7 +641,11 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
+
+			fmt.Printf("Global: %s type %v\n", GlobalVars[idx].name, GlobalVars[idx].objtype)
+
 			if objType == VAR_CLASS {
+
 				GlobalVars[idx].Class = CurrentClass
 			}
 
@@ -675,14 +679,21 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		if isGlobal {
 			valType = GlobalVars[idx].datatype
 			objType = GlobalVars[idx].objtype
-			CurrentClass = GlobalVars[idx].Class
+			if objType == VAR_CLASS {
+				CurrentClass = GlobalVars[idx].Class
+			}
+
 		} else if isLocal {
 			valType = c.Current.Locals[idx].dataType
 			objType = c.Current.Locals[idx].objtype
-			CurrentClass = c.Current.Locals[idx].Class
+			if objType == VAR_CLASS {
+				CurrentClass = c.Current.Locals[idx].Class
+			}
 		} else if isUpvalue {
 			valType = c.Current.Upvalues[idx].dataType
-			CurrentClass = c.Current.Upvalues[idx].Class
+			if objType == VAR_CLASS {
+				CurrentClass = c.Current.Upvalues[idx].Class
+			}
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
@@ -819,13 +830,17 @@ func (c *Compiler) DeclareVariable() {
 	// on the stack as well
 	var data ExpressionData
 	if c.Match(TOKEN_EQUAL) {
+
 		c.Expression()
 		data = PopExpressionValue()
 		valType = data.Value
+
 	} else {
+
 		c.EmitOp(OP_NIL)
 		c.WriteComment("No equality token after variable declaration")
 		valType = VAL_NIL
+
 	}
 	c.EmitInstr(opcode, index)
 	PushExpressionValue(data)
@@ -841,6 +856,7 @@ func (c *Compiler) DeclareVariable() {
 		GlobalVars[index].IsInitialized = true
 		GlobalVars[index].datatype = valType
 		GlobalVars[index].objtype = data.ObjType
+
 		if data.ObjType == VAR_CLASS {
 			GlobalVars[index].Class = CurrentClass
 		}
@@ -1754,7 +1770,17 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 
 	// Name of the property
 	pName := c.Parser.Previous.ToString()
+	idx := c.MakeConstant(&ObjString{pName})
 	c.AddProperty(class, pName)
+
+	if c.Match(TOKEN_EQUAL) {
+		if c.Match(TOKEN_METHOD) {
+			c.Method(true)
+			c.EmitInstr(OP_SET_PROPERTY, idx)
+		} else {
+
+		}
+	}
 
 }
 
@@ -1818,16 +1844,16 @@ func (c *Compiler) Class(canAssign bool) {
 	vclass.Id = ClassId
 
 	c.EmitOp(OP_CLASS)
-	CurrentClass = &vclass
 	PushExpressionValue(ExpressionData{
 		Value:   VAL_CLASS,
 		ObjType: VAR_CLASS,
 	})
-
+	CurrentClass = &vclass
 	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.")
 	c.ClearCR()
 	// Keep going until we identified all properties and methods
 	for !c.Match(TOKEN_RIGHT_BRACE) && !c.Match(TOKEN_EOF) {
+		CurrentClass = &vclass
 		c.ClassComponents(&vclass)
 		c.ClearCR()
 	}

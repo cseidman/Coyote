@@ -182,7 +182,6 @@ func (v *VM) MethodCall() {
 
 func (v *VM) FunctionCall(argCount int16) {
 	// Get the parameters
-
 	closure := v.Peek(int(argCount)).(*ObjClosure)
 	v.ExecCall(closure, argCount+1)
 }
@@ -428,16 +427,12 @@ func (v *VM) Dispatch(opCode byte) {
 		class.Fields[propertyName] = v.Pop()
 
 	case OP_CLASS:
-		// Get the subclass if there is one
+
 		class := &ObjClass{
 			Fields: make(map[string]Obj),
 		}
-		subClass := v.Pop()
-		if subClass.Type() != VAL_NIL {
-			// todo: Subclass logic
-		}
-
 		v.Push(class)
+
 	case OP_CLOSURE:
 		{
 			function := v.GetOperand().(*ObjFunction)
