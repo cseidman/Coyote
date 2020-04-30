@@ -16,6 +16,13 @@ const (
 	MAX_MEMORY_SLOTS = 2048000
 )
 
+// Current Class. This is a cheap way to know what class we're
+// referring to when we come to a . modifier
+var CurrentClass *ClassVar
+
+// Classes
+var ClassBag = make(map[string]*ClassVar)
+
 // Keeps track of break and continue instruction locations
 type Break struct {
 	StartLoc int  // Continue will bump up to here
@@ -160,6 +167,7 @@ type Global struct {
 	datatype      ValueType
 	objtype       VarType
 	IsInitialized bool
+	Class         *ClassVar
 }
 
 var GlobalVars = make([]Global, 65000)
@@ -169,7 +177,10 @@ func AddGlobal(tok Token) int16 {
 
 	vType := GetTokenType(tok.Type)
 
-	GlobalVars[GlobalCount] = Global{tok, vType, VAR_UNKNOWN, false}
+	GlobalVars[GlobalCount].name = tok
+	GlobalVars[GlobalCount].datatype = vType
+	GlobalVars[GlobalCount].objtype = VAR_UNKNOWN
+
 	GlobalCount++
 	return GlobalCount - 1
 }
@@ -182,12 +193,14 @@ type Local struct {
 	scopeId       int
 	objtype       VarType
 	IsInitialized bool
+	Class         *ClassVar
 }
 
 type Upvalue struct {
 	Index    int16
 	IsLocal  bool
 	dataType ValueType
+	Class    *ClassVar
 }
 
 var namedRegisters = make(map[string]int16)
@@ -473,6 +486,10 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
 
+	// See if it's a class. If it is, we record it
+	// for later
+	//isClass := c.Check(TOKEN_DOT)
+
 	// Above all, check to see if this name is a built-in function
 	nativeFunction := ResolveNativeFunction(tok.ToString())
 	if nativeFunction != nil {
@@ -624,6 +641,9 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
+			if objType == VAR_CLASS {
+				GlobalVars[idx].Class = CurrentClass
+			}
 
 		} else if isLocal {
 			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].dataType {
@@ -633,8 +653,16 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			c.Current.Locals[idx].IsInitialized = true
 			c.Current.Locals[idx].dataType = valType
 			c.Current.Locals[idx].objtype = objType
+
+			if objType == VAR_CLASS {
+				c.Current.Locals[idx].Class = CurrentClass
+			}
+
 		} else if isUpvalue {
 			c.Current.Upvalues[idx].dataType = valType
+			if objType == VAR_CLASS {
+				c.Current.Upvalues[idx].Class = CurrentClass
+			}
 		}
 
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
@@ -647,11 +675,14 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		if isGlobal {
 			valType = GlobalVars[idx].datatype
 			objType = GlobalVars[idx].objtype
+			CurrentClass = GlobalVars[idx].Class
 		} else if isLocal {
 			valType = c.Current.Locals[idx].dataType
 			objType = c.Current.Locals[idx].objtype
+			CurrentClass = c.Current.Locals[idx].Class
 		} else if isUpvalue {
 			valType = c.Current.Upvalues[idx].dataType
+			CurrentClass = c.Current.Upvalues[idx].Class
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
@@ -810,6 +841,10 @@ func (c *Compiler) DeclareVariable() {
 		GlobalVars[index].IsInitialized = true
 		GlobalVars[index].datatype = valType
 		GlobalVars[index].objtype = data.ObjType
+		if data.ObjType == VAR_CLASS {
+			GlobalVars[index].Class = CurrentClass
+		}
+
 	case OP_SET_LOCAL:
 
 		if c.Current.Locals[index].IsInitialized && valType != c.Current.Locals[index].dataType {
@@ -818,6 +853,10 @@ func (c *Compiler) DeclareVariable() {
 		c.Current.Locals[index].IsInitialized = true
 		c.Current.Locals[index].dataType = valType
 		c.Current.Locals[index].objtype = data.ObjType
+		if data.ObjType == VAR_CLASS {
+			c.Current.Locals[index].Class = CurrentClass
+		}
+
 	}
 
 	c.Match(TOKEN_CR) // Remove any CR after the declaration
@@ -1146,7 +1185,10 @@ func (c *Compiler) Binary(canAssign bool) {
 			c.EmitOp(OP_FMULTIPLY)
 			PushExpressionValue(data)
 		} else {
-			c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
+			c.EmitOp(OP_IMULTIPLY)
+			PushExpressionValue(data)
+			fmt.Println("Error finding property type")
+			//c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
 		}
 	case TOKEN_SLASH:
 		if data.Value == VAL_INTEGER {
@@ -1171,6 +1213,15 @@ func (c *Compiler) Binary(canAssign bool) {
 	}
 }
 
+func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ValueType {
+	for i := int16(0); i < class.PropertyCount; i++ {
+		if class.Properties[i].Name == propertyName {
+			return class.Properties[i].DataType
+		}
+	}
+	return VAL_NIL
+}
+
 func (c *Compiler) Dot(canAssign bool) {
 	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after '.'.")
 	name := c.Parser.Previous.ToString()
@@ -1178,6 +1229,7 @@ func (c *Compiler) Dot(canAssign bool) {
 	isMethod := c.Match(TOKEN_LEFT_PAREN) // Is this is a method?
 
 	idx := c.MakeConstant(&ObjString{name})
+	vType := c.FindPropertyType(CurrentClass, name)
 
 	if isMethod {
 		c.CallMethod(idx)
@@ -1194,6 +1246,10 @@ func (c *Compiler) Dot(canAssign bool) {
 			c.EmitInstr(setOp, idx)
 		} else {
 			c.EmitInstr(getOp, idx)
+			PushExpressionValue(ExpressionData{
+				Value:   vType,
+				ObjType: VAR_SCALAR,
+			})
 		}
 	}
 }
@@ -1777,6 +1833,7 @@ func (c *Compiler) Class(canAssign bool) {
 	}
 
 	c.EmitOp(OP_CLASS)
+	CurrentClass = &vclass
 	PushExpressionValue(ExpressionData{
 		Value:   VAL_CLASS,
 		ObjType: VAR_CLASS,
