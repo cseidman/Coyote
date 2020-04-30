@@ -1,6 +1,6 @@
 var tt = class {
     private multi:int
-    Sumit = function(x:int,y:int) int {
+    Sumit = method(x:int,y:int) int {
         return (x+y)*this.multi
     }
 }
