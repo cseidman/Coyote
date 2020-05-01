@@ -12,3 +12,12 @@ var fn = function(x:class) int {
 }
 
 print fn(tt)
+
+var test = class {
+    private x:class
+    callit = method() int {
+        return this.x.Sumit(2,4)
+    }
+}
+test.x = tt
+print test.callit()

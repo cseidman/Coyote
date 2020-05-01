@@ -367,7 +367,7 @@ func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) (int16, *Expressio
 			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
-			fmt.Printf("Resolved %s at %d\n", name, i)
+
 			return i, &ExpressionData{Value: fn.Locals[i].dataType, ObjType: fn.Locals[i].objtype}
 		}
 	}
@@ -713,7 +713,7 @@ func (c *Compiler) DefineProperty() {
 	var valType ValueType
 
 	c.Consume(TOKEN_COLON, "Expect ':' with type aftermethod")
-	valType = c.GetDataType()
+	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
 	}
@@ -730,7 +730,7 @@ func (c *Compiler) DefineParameter() {
 	var valType ValueType
 
 	c.Consume(TOKEN_COLON, "Expect ':' with type after parameter")
-	valType = c.GetDataType()
+	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
 	}
@@ -754,39 +754,31 @@ func (c *Compiler) DefineParameter() {
 
 }
 
-func (c *Compiler) GetDataType() ValueType {
+func (c *Compiler) GetDataType() ExpressionData {
+
+	expd := new(ExpressionData)
 
 	if c.Match(TOKEN_TYPE_INTEGER) {
-		return VAL_INTEGER
+		expd.Value = VAL_INTEGER
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_TYPE_FLOAT) {
-		return VAL_FLOAT
+		expd.Value = VAL_FLOAT
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_TYPE_STRING) {
-		return VAL_STRING
+		expd.Value = VAL_STRING
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_FUNC) {
-		return VAL_FUNCTION
+		expd.Value = VAL_FUNCTION
+		expd.ObjType = VAR_FUNCTION
 	} else if c.Match(TOKEN_CLASS) {
-		return VAL_CLASS
+		expd.Value = VAL_CLASS
+		expd.ObjType = VAR_CLASS
 	} else {
-		return VAL_NIL
+		c.Advance()
+		expd.Value = VAL_NIL
+		expd.ObjType = VAR_SCALAR
 	}
-
-}
-
-func (c *Compiler) GetObjType() VarType {
-
-	if c.Match(TOKEN_TYPE_INTEGER) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_FLOAT) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_STRING) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_FUNC) {
-		return VAR_FUNCTION
-	} else if c.Match(TOKEN_ARRAY) {
-		return VAR_ARRAY
-	}
-	return VAR_UNKNOWN
-
+	return *expd
 }
 
 func (c *Compiler) DeclareVariable() {
@@ -1113,7 +1105,7 @@ func (c *Compiler) Unary(canAssign bool) {
 	// Compile the operand.
 	c.ParsePrecedence(PREC_UNARY)
 
-	valtype := c.GetDataType()
+	valtype := c.GetDataType().Value
 
 	// Emit the operator instruction.
 	switch operatorType {
@@ -1202,10 +1194,10 @@ func (c *Compiler) Binary(canAssign bool) {
 			c.EmitOp(OP_FMULTIPLY)
 			PushExpressionValue(data)
 		} else {
-			c.EmitOp(OP_IMULTIPLY)
-			PushExpressionValue(data)
-			fmt.Println("Error finding property type")
-			//c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
+			//c.EmitOp(OP_IMULTIPLY)
+			//PushExpressionValue(data)
+			//fmt.Println("Error finding property type")
+			c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
 		}
 	case TOKEN_SLASH:
 		if data.Value == VAL_INTEGER {
@@ -1263,6 +1255,7 @@ func (c *Compiler) Dot(canAssign bool) {
 			c.EmitInstr(setOp, idx)
 		} else {
 			c.EmitInstr(getOp, idx)
+			c.WriteComment(fmt.Sprintf("Name '%s' of type %s", name, ValueTypeLabel[vType]))
 			PushExpressionValue(ExpressionData{
 				Value:   vType,
 				ObjType: VAR_SCALAR,
@@ -1322,10 +1315,11 @@ func (c *Compiler) Array(canAssign bool) {
 	var dType ValueType
 	for {
 		c.Expression()
+		valType := c.GetDataType().Value
 		if elements == 0 {
-			dType = c.GetDataType()
+			dType = valType
 		}
-		if dType != c.GetDataType() {
+		if dType != valType {
 			c.Error(fmt.Sprintf("Element %d is incompatible with first element type %d",
 				elements, dType))
 		}
@@ -1792,11 +1786,14 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 	prop.Name = name
 	if c.Match(TOKEN_COLON) {
-		prop.ObjType = c.GetObjType()
-		prop.DataType = c.GetDataType()
+		expData := c.GetDataType()
+		prop.ObjType = expData.ObjType
+		prop.DataType = expData.Value
+
 	} else {
 		// This is a function
-		prop.ObjType = c.GetObjType()
+		//expData := c.GetDataType()
+		prop.ObjType = VAR_FUNCTION
 		prop.DataType = VAL_CLOSURE
 	}
 
@@ -1805,7 +1802,7 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 	class.PropertyCount++
 
-	class.Class.FieldCount = class.PropertyCount
+	class.Class.FieldCount = class.PropertyCount - 1
 
 }
 
@@ -1939,7 +1936,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 	// If there is a return value, then declare it here
 	isReturnValue := false
-	c.Current.returnType = c.GetDataType()
+	c.Current.returnType = c.GetDataType().Value
 	if c.Current.returnType != VAL_NIL {
 		isReturnValue = true
 	}
