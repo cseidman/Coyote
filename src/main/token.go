@@ -68,7 +68,7 @@ const (
 	TOKEN_IF
 	TOKEN_NIL
 	TOKEN_OR
-	TOKEN_PRINT
+	//TOKEN_PRINT
 	TOKEN_RETURN
 	// 50
 	TOKEN_SUPER
@@ -186,10 +186,10 @@ var TokenLabels = map[string]TokenProperties{
 	"function": {TOKEN_FUNC, true},
 	"select":   {TOKEN_SELECT, true},
 	//40
-	"if":     {TOKEN_IF, true},
-	"nil":    {TOKEN_NIL, true},
-	"or":     {TOKEN_OR, true},
-	"print":  {TOKEN_PRINT, true},
+	"if":  {TOKEN_IF, true},
+	"nil": {TOKEN_NIL, true},
+	"or":  {TOKEN_OR, true},
+	/*"print":  {TOKEN_PRINT, true},*/
 	"return": {TOKEN_RETURN, true},
 	"super":  {TOKEN_SUPER, true},
 	"this":   {TOKEN_THIS, true},

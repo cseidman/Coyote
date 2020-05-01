@@ -63,8 +63,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},        // TOKEN_IF
 		{c.Literal, nil, nil, PREC_NONE},  // TOKEN_NIL
 		{nil, c.or_, nil, PREC_OR},        // TOKEN_OR
-		{nil, nil, nil, PREC_NONE},        // TOKEN_PRINT
-		{nil, nil, nil, PREC_NONE},        // TOKEN_RETURN
+		/*{nil, nil, nil, PREC_NONE},        // TOKEN_PRINT*/
+		{nil, nil, nil, PREC_NONE}, // TOKEN_RETURN
 		// 50
 		{nil, nil, nil, PREC_NONE},       // TOKEN_SUPER
 		{c.this_, nil, nil, PREC_NONE},   // TOKEN_THIS
