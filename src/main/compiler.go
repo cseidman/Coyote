@@ -315,7 +315,7 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 			// it's a string
 			if c.CurrentInstructions().Constants[i].Type() == VAL_STRING {
 				// If the strings match
-				if c.CurrentInstructions().Constants[i].(*ObjString).Value == value.(*ObjString).Value {
+				if c.CurrentInstructions().Constants[i].(ObjString) == value.(ObjString) {
 					return i
 				}
 			}
@@ -620,12 +620,11 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	if canAssign && c.Match(TOKEN_EQUAL) {
 
 		c.Expression()
-		if isHasOperand {
-			c.EmitInstr(setOp, idx)
-		} else {
-			c.EmitOp(setOp)
-		}
-
+		//if isHasOperand {
+		c.EmitInstr(setOp, idx)
+		//} else {
+		//	c.EmitOp(setOp)
+		//}
 		data := PopExpressionValue()
 		if isArray {
 			valType = data.Value
@@ -642,8 +641,6 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			GlobalVars[idx].IsInitialized = true
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
-
-			fmt.Printf("Global: %s type %v\n", GlobalVars[idx].name, GlobalVars[idx].objtype)
 
 			if objType == VAR_CLASS {
 
@@ -703,7 +700,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 }
 
 func (c *Compiler) IdentifierConstant() int16 {
-	return c.MakeConstant(&ObjString{Value: string(c.Parser.Previous.Value)})
+	return c.MakeConstant(ObjString(string(c.Parser.Previous.Value)))
 }
 
 func (c *Compiler) DefineProperty() {
@@ -1237,7 +1234,7 @@ func (c *Compiler) Dot(canAssign bool) {
 
 	isMethod := c.Match(TOKEN_LEFT_PAREN) // Is this is a method?
 
-	idx := c.MakeConstant(&ObjString{name})
+	idx := c.MakeConstant(ObjString(name))
 	vType := c.FindPropertyType(CurrentClass, name)
 
 	if isMethod {
@@ -1344,7 +1341,7 @@ func (c *Compiler) Variable(canAssign bool) {
 func (c *Compiler) String(canAssign bool) {
 	value := c.Parser.Previous.ToString()
 	// Remove the quotes
-	idx := c.MakeConstant(&ObjString{Value: value[1:(len(value) - 1)]})
+	idx := c.MakeConstant(ObjString(value[1:(len(value) - 1)]))
 	c.EmitInstr(OP_SCONST, idx)
 
 	if len(value) > 10 {
@@ -1766,7 +1763,7 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 	// Name of the property
 	pName := c.Parser.Previous.ToString()
 	// Use this to set the property
-	idx := c.MakeConstant(&ObjString{pName})
+	idx := c.MakeConstant(ObjString(pName))
 	c.AddProperty(class, pName)
 
 	if c.Match(TOKEN_EQUAL) {
@@ -2002,8 +1999,6 @@ func (c *Compiler) Statement() {
 		//c.CreateStatement()
 	} else if c.Match(TOKEN_INCLUDE) {
 		//c.IncludeStatement()
-	} else if c.Match(TOKEN_PRINT) {
-		c.PrintStatement()
 	} else if c.Match(TOKEN_IF) {
 		c.IfStatement()
 	} else if c.Match(TOKEN_RETURN) {
@@ -2031,12 +2026,6 @@ func (c *Compiler) Statement() {
 	} else {
 		c.ExpressionStatement()
 	}
-}
-
-func (c *Compiler) PrintStatement() {
-	c.Expression()
-	c.Consume(TOKEN_CR, "Expect 'CR' after value.")
-	c.EmitOp(OP_PRINT)
 }
 
 func (c *Compiler) Evaluate() {

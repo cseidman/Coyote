@@ -149,7 +149,7 @@ func (v *VM) CallNative() {
 
 func (v *VM) MethodCall() {
 
-	idx := v.GetOperand().(*ObjString).Value
+	idx := string(v.GetOperand().(ObjString))
 	argCount := int(v.GetOperandValue()) - 1
 	classInst := v.Peek(argCount).(*ObjClass)
 
@@ -421,7 +421,7 @@ func (v *VM) Dispatch(opCode byte) {
 		return
 
 	case OP_BIND_PROPERTY:
-		propertyName := v.GetOperand().(*ObjString).Value
+		propertyName := string(v.GetOperand().(ObjString))
 		class := v.Peek(1).(*ObjClass)
 
 		class.Fields[propertyName] = v.Pop()
@@ -475,12 +475,12 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_PROPERTY:
 		classInst := v.Peek(1).(*ObjClass)
-		idx := v.GetOperand().(*ObjString).Value
+		idx := string(v.GetOperand().(ObjString))
 		classInst.Fields[idx] = v.Pop()
 
 	case OP_GET_PROPERTY:
 		classInst := v.Pop().(*ObjClass)
-		idx := v.GetOperand().(*ObjString).Value
+		idx := string(v.GetOperand().(ObjString))
 		v.Push(classInst.Fields[idx])
 
 	case OP_CALL_NATIVE:
@@ -511,10 +511,10 @@ func (v *VM) Dispatch(opCode byte) {
 
 		v.Push(rval + lval)
 	case OP_SADD:
-		rval := v.Pop().(*ObjString).Value
-		lval := v.Pop().(*ObjString).Value
+		rval := string(v.Pop().(ObjString))
+		lval := string(v.Pop().(ObjString))
 
-		v.Push(&ObjString{Value: lval + rval})
+		v.Push(ObjString(lval + rval))
 	case OP_ISUBTRACT:
 		rval := v.Pop().(ObjInteger)
 		lval := v.Pop().(ObjInteger)

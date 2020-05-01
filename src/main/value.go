@@ -9,6 +9,7 @@ type Obj interface {
 	ShowValue() string
 	Type() ValueType
 	ToBytes() []byte
+	ToValue() interface{}
 }
 
 type Iterator interface {
@@ -29,19 +30,21 @@ type ObjColumnDef struct {
 
 type oByte byte
 
-func (o oByte) ShowValue() string { return string(o) }
-func (o oByte) Type() ValueType   { return VAL_BYTE }
-func (o oByte) ToBytes() []byte   { return []byte{byte(o)} }
+func (o oByte) ShowValue() string    { return string(o) }
+func (o oByte) Type() ValueType      { return VAL_BYTE }
+func (o oByte) ToBytes() []byte      { return []byte{byte(o)} }
+func (o oByte) ToValue() interface{} { return o }
 
 // Interface types
-func (c ObjColumnDef) ShowValue() string { return fmt.Sprintf("%s", c.ColumnName) }
-func (c ObjColumnDef) Type() ValueType   { return VAL_COLUMN_DEF }
-func (c ObjColumnDef) ToBytes() []byte   { return nil }
+func (c ObjColumnDef) ShowValue() string    { return fmt.Sprintf("%s", c.ColumnName) }
+func (c ObjColumnDef) Type() ValueType      { return VAL_COLUMN_DEF }
+func (c ObjColumnDef) ToBytes() []byte      { return nil }
+func (c ObjColumnDef) ToValue() interface{} { return c.ShowValue() }
 
 // User types
 type ObjInteger int64
 type ObjFloat float64 //struct{ Value float64 }
-type ObjString struct{ Value string }
+type ObjString string
 type ObjBool struct{ Value bool }
 type ObjByte struct{ Value byte }
 type NULL struct{}
@@ -60,9 +63,10 @@ type ObjMethod struct {
 }
 
 // Interface types
-func (c ObjMethod) ShowValue() string { return fmt.Sprintf("%s", "<Method>") }
-func (c ObjMethod) Type() ValueType   { return VAL_METHOD }
-func (c ObjMethod) ToBytes() []byte   { return nil }
+func (c ObjMethod) ShowValue() string    { return fmt.Sprintf("%s", "<Method>") }
+func (c ObjMethod) Type() ValueType      { return VAL_METHOD }
+func (c ObjMethod) ToBytes() []byte      { return nil }
+func (c ObjMethod) ToValue() interface{} { return c.ShowValue() }
 
 type ObjProperty struct {
 	Property Obj
@@ -70,9 +74,10 @@ type ObjProperty struct {
 }
 
 // Interface types
-func (c ObjProperty) ShowValue() string { return fmt.Sprintf("%s", "<Property>") }
-func (c ObjProperty) Type() ValueType   { return c.Property.Type() }
-func (c ObjProperty) ToBytes() []byte   { return nil }
+func (c ObjProperty) ShowValue() string    { return fmt.Sprintf("%s", "<Property>") }
+func (c ObjProperty) Type() ValueType      { return c.Property.Type() }
+func (c ObjProperty) ToBytes() []byte      { return nil }
+func (c ObjProperty) ToValue() interface{} { return c.ShowValue() }
 
 var FunctionId int
 
@@ -146,9 +151,10 @@ func NewClass(className string) *ObjClass {
 	return class
 }
 
-func (c ObjClass) ShowValue() string { return fmt.Sprintf("%s", "Class") }
-func (c ObjClass) Type() ValueType   { return VAL_CLASS }
-func (c ObjClass) ToBytes() []byte   { return nil }
+func (c ObjClass) ShowValue() string    { return fmt.Sprintf("%s", "Class") }
+func (c ObjClass) Type() ValueType      { return VAL_CLASS }
+func (c ObjClass) ToBytes() []byte      { return nil }
+func (c ObjClass) ToValue() interface{} { return c.ShowValue() }
 
 // List functions
 
@@ -163,10 +169,15 @@ type HKey interface {
 }
 
 func (l ObjList) ShowValue() string {
-	return fmt.Sprintf("%s", "List")
+	s := ""
+	for k, v := range l.List {
+		s += fmt.Sprintf("(%v=%v)\n", k, v)
+	}
+	return s
 }
-func (l ObjList) Type() ValueType { return VAL_LIST }
-func (l ObjList) ToBytes() []byte { return nil }
+func (l ObjList) Type() ValueType      { return VAL_LIST }
+func (l ObjList) ToBytes() []byte      { return nil }
+func (l ObjList) ToValue() interface{} { return l.List }
 
 func (l ObjList) Init(keyType ValueType, elementCount int) {
 	l.ElementCount = elementCount
@@ -202,8 +213,9 @@ func (l ObjList) SetValue(obj Obj, val Obj) {
 func (u ObjUpvalue) ShowValue() string {
 	return fmt.Sprintf("%s", "Upvalue")
 }
-func (u ObjUpvalue) Type() ValueType { return VAL_UPVALUE }
-func (u ObjUpvalue) ToBytes() []byte { return nil }
+func (u ObjUpvalue) Type() ValueType      { return VAL_UPVALUE }
+func (u ObjUpvalue) ToBytes() []byte      { return nil }
+func (u ObjUpvalue) ToValue() interface{} { return u.ShowValue() }
 
 func NewUpvalue(slot *Obj) *ObjUpvalue {
 	upvalue := new(ObjUpvalue)
@@ -218,9 +230,10 @@ func NewUpvalue(slot *Obj) *ObjUpvalue {
 }
 
 // Closure functions
-func (c ObjClosure) ShowValue() string { return fmt.Sprintf("%s", "<fn>") }
-func (c ObjClosure) Type() ValueType   { return VAL_CLOSURE }
-func (c ObjClosure) ToBytes() []byte   { return nil }
+func (c ObjClosure) ShowValue() string    { return fmt.Sprintf("%s", "<fn>") }
+func (c ObjClosure) Type() ValueType      { return VAL_CLOSURE }
+func (c ObjClosure) ToBytes() []byte      { return nil }
+func (c ObjClosure) ToValue() interface{} { return c.ShowValue() }
 
 func NewClosure(function *ObjFunction) *ObjClosure {
 	// Make an array of upvalues of the same size as the number of
@@ -243,8 +256,9 @@ func NewClosure(function *ObjFunction) *ObjClosure {
 func (f ObjFunction) ShowValue() string {
 	return fmt.Sprintf("%s", "<fn>")
 }
-func (f ObjFunction) Type() ValueType { return VAL_FUNCTION }
-func (f ObjFunction) ToBytes() []byte { return nil }
+func (f ObjFunction) Type() ValueType      { return VAL_FUNCTION }
+func (f ObjFunction) ToBytes() []byte      { return nil }
+func (f ObjFunction) ToValue() interface{} { return f.ShowValue() }
 
 func NewFunction() ObjFunction {
 
@@ -266,8 +280,9 @@ func NewFunction() ObjFunction {
 func (n ObjNative) ShowValue() string {
 	return fmt.Sprintf("%s", "<native fn>")
 }
-func (n ObjNative) Type() ValueType { return VAL_NATIVE }
-func (n ObjNative) ToBytes() []byte { return nil }
+func (n ObjNative) Type() ValueType      { return VAL_NATIVE }
+func (n ObjNative) ToBytes() []byte      { return nil }
+func (n ObjNative) ToValue() interface{} { return n.ShowValue() }
 
 func NewNative(function *NativeFn) *ObjNative {
 	native := new(ObjNative)
@@ -276,14 +291,18 @@ func NewNative(function *NativeFn) *ObjNative {
 }
 
 // NULL functions
-func (n NULL) ShowValue() string { return fmt.Sprintf("%s", "null") }
-func (n NULL) Type() ValueType   { return VAL_NIL }
-func (n NULL) ToBytes() []byte   { return nil }
+func (n NULL) ShowValue() string    { return fmt.Sprintf("%s", "null") }
+func (n NULL) Type() ValueType      { return VAL_NIL }
+func (n NULL) ToBytes() []byte      { return nil }
+func (n NULL) ToValue() interface{} { return nil }
 
 // Integer functions
 func (i ObjInteger) ShowValue() string { return fmt.Sprintf("%d", i) }
 func (i ObjInteger) Type() ValueType   { return VAL_INTEGER }
 func (i ObjInteger) ToBytes() []byte   { return Int64ToBytes(int64(i)) }
+func (i ObjInteger) ToValue() interface{} {
+	return int64(i)
+}
 
 func (i ObjInteger) HashValue() HashKey {
 	return HashKey{
@@ -293,9 +312,10 @@ func (i ObjInteger) HashValue() HashKey {
 }
 
 // Float functions
-func (f ObjFloat) ShowValue() string { return fmt.Sprintf("%f", f) }
-func (f ObjFloat) Type() ValueType   { return VAL_FLOAT }
-func (f ObjFloat) ToBytes() []byte   { return Float64ToBytes(float64(f)) }
+func (f ObjFloat) ShowValue() string    { return fmt.Sprintf("%f", f) }
+func (f ObjFloat) Type() ValueType      { return VAL_FLOAT }
+func (f ObjFloat) ToBytes() []byte      { return Float64ToBytes(float64(f)) }
+func (f ObjFloat) ToValue() interface{} { return f }
 
 func (f *ObjFloat) HashValue() HashKey {
 	return HashKey{
@@ -305,13 +325,14 @@ func (f *ObjFloat) HashValue() HashKey {
 }
 
 // String functions
-func (s ObjString) ShowValue() string { return fmt.Sprintf("%s", s.Value) }
-func (s ObjString) Type() ValueType   { return VAL_STRING }
-func (s ObjString) ToBytes() []byte   { return []byte(s.Value) }
+func (s ObjString) ShowValue() string    { return fmt.Sprintf("%s", s) }
+func (s ObjString) Type() ValueType      { return VAL_STRING }
+func (s ObjString) ToBytes() []byte      { return []byte(s) }
+func (s ObjString) ToValue() interface{} { return s }
 
 func (s *ObjString) HashValue() HashKey {
 	bw := fnv.New64a()
-	_, _ = bw.Write([]byte(s.Value))
+	_, _ = bw.Write([]byte(*s))
 	return HashKey{
 		Type:      VAL_STRING,
 		HashValue: bw.Sum64(),
@@ -319,9 +340,10 @@ func (s *ObjString) HashValue() HashKey {
 }
 
 // Byte functions
-func (b ObjByte) ShowValue() string { return fmt.Sprintf("%d", b.Value) }
-func (b ObjByte) Type() ValueType   { return VAL_BYTE }
-func (b ObjByte) ToBytes() []byte   { return []byte{b.Value} }
+func (b ObjByte) ShowValue() string    { return fmt.Sprintf("%d", b.Value) }
+func (b ObjByte) Type() ValueType      { return VAL_BYTE }
+func (b ObjByte) ToBytes() []byte      { return []byte{b.Value} }
+func (b ObjByte) ToValue() interface{} { return b.Value }
 
 // Bool functions
 func (b ObjBool) ShowValue() string {
@@ -331,8 +353,9 @@ func (b ObjBool) ShowValue() string {
 		return fmt.Sprintf("%s", "F")
 	}
 }
-func (b ObjBool) Type() ValueType { return VAL_BOOL }
-func (b ObjBool) ToBytes() []byte { return BoolToBytes(b.Value) }
+func (b ObjBool) Type() ValueType      { return VAL_BOOL }
+func (b ObjBool) ToBytes() []byte      { return BoolToBytes(b.Value) }
+func (b ObjBool) ToValue() interface{} { return b.Value }
 
 func (b ObjBool) HashValue() HashKey {
 	var val uint64
@@ -364,6 +387,7 @@ func (a ObjArray) Init(v ValueType, e int) {
 	a.ElementTypes = v
 	a.Elements = make([]Obj, e)
 }
+func (a ObjArray) ToValue() interface{} { return a.Elements }
 
 // Iterator interface
 func (a ObjArray) Count() int {
@@ -387,9 +411,11 @@ func (a ObjArray) GetElement(element int64) Obj {
 	return a.Elements[element]
 }
 
+type ObjEnum struct {
+}
+
 // Utility functions
 func MakeStringObj(str string) *ObjString {
-	obj := new(ObjString)
-	obj.Value = str
-	return obj
+	s := ObjString(str)
+	return &s
 }
