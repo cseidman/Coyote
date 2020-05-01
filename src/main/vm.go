@@ -148,9 +148,10 @@ func (v *VM) CallNative() {
 }
 
 func (v *VM) MethodCall() {
-	idx := v.GetOperand().(*ObjString).Value  // Index of the function variable
-	argCount := int(v.GetOperandValue())      // Number of arguments
-	classInst := v.Peek(argCount).(*ObjClass) // The class
+
+	idx := string(v.GetOperand().(ObjString))
+	argCount := int(v.GetOperandValue()) - 1
+	classInst := v.Peek(argCount).(*ObjClass)
 
 	fld := classInst.Fields[idx]
 	if fld.Type() == VAL_NATIVE {
@@ -181,7 +182,6 @@ func (v *VM) MethodCall() {
 
 func (v *VM) FunctionCall(argCount int16) {
 	// Get the parameters
-
 	closure := v.Peek(int(argCount)).(*ObjClosure)
 	v.ExecCall(closure, argCount+1)
 }
@@ -349,7 +349,7 @@ mainLoop:
 }
 
 func (v *VM) DebugInfo(opCode byte) {
-	for i := 0; i < 8; i++ {
+	for i := 0; i < 12; i++ {
 		// Loop over the slots of the current frame
 		if i >= v.sp {
 			// If there are less than 5 elements in the stack then just print blanks
@@ -421,22 +421,18 @@ func (v *VM) Dispatch(opCode byte) {
 		return
 
 	case OP_BIND_PROPERTY:
-		propertyName := v.GetOperand().(*ObjString).Value
+		propertyName := string(v.GetOperand().(ObjString))
 		class := v.Peek(1).(*ObjClass)
 
 		class.Fields[propertyName] = v.Pop()
 
 	case OP_CLASS:
-		// Get the subclass if there is one
+
 		class := &ObjClass{
 			Fields: make(map[string]Obj),
 		}
-		subClass := v.Pop()
-		if subClass.Type() != VAL_NIL {
-			// todo: Subclass logic
-		}
-
 		v.Push(class)
+
 	case OP_CLOSURE:
 		{
 			function := v.GetOperand().(*ObjFunction)
@@ -479,12 +475,12 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_PROPERTY:
 		classInst := v.Peek(1).(*ObjClass)
-		idx := v.GetOperand().(*ObjString).Value
+		idx := string(v.GetOperand().(ObjString))
 		classInst.Fields[idx] = v.Pop()
 
 	case OP_GET_PROPERTY:
 		classInst := v.Pop().(*ObjClass)
-		idx := v.GetOperand().(*ObjString).Value
+		idx := string(v.GetOperand().(ObjString))
 		v.Push(classInst.Fields[idx])
 
 	case OP_CALL_NATIVE:
@@ -515,10 +511,10 @@ func (v *VM) Dispatch(opCode byte) {
 
 		v.Push(rval + lval)
 	case OP_SADD:
-		rval := v.Pop().(*ObjString).Value
-		lval := v.Pop().(*ObjString).Value
+		rval := string(v.Pop().(ObjString))
+		lval := string(v.Pop().(ObjString))
 
-		v.Push(&ObjString{Value: lval + rval})
+		v.Push(ObjString(lval + rval))
 	case OP_ISUBTRACT:
 		rval := v.Pop().(ObjInteger)
 		lval := v.Pop().(ObjInteger)

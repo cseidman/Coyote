@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,6 +16,9 @@ func RegisterNative(name string, ofn NativeFn) {
 func RegisterFunctions() {
 	RegisterNative("Add", AddIt)
 	RegisterNative("OpenFile", OpenFile)
+	RegisterNative("print", Out)
+	RegisterNative("println", Outln)
+	RegisterNative("printf", Outf)
 }
 
 func ResolveNativeFunction(name string) *ObjNative {
@@ -36,8 +40,44 @@ var AddIt NativeFn = func(vm *VM, args int, argpos int) Obj {
 	return x + y
 }
 
+// Print operations -------------------------------------------
+var Outf NativeFn = func(vm *VM, args int, argpos int) Obj {
+	// If there's only one parameter the print as is
+	fmt.Print(formattedValue(vm, args))
+	return nil
+}
+
+var Out NativeFn = func(vm *VM, args int, argpos int) Obj {
+	x := vm.Pop()
+	fmt.Print(x.ShowValue())
+	return nil
+}
+
+var Outln NativeFn = func(vm *VM, args int, argpos int) Obj {
+	x := vm.Pop()
+	fmt.Println(x.ShowValue())
+	return nil
+}
+
+// Supporting function
+func formattedValue(vm *VM, args int) string {
+	if args == 0 {
+		x := vm.Pop()
+		return fmt.Sprint(x.ShowValue())
+	} else {
+		argVals := make([]interface{}, args-1)
+		for i := args - 1; i > 0; i-- {
+			argVals[i-1] = vm.Pop().ToValue()
+		}
+		// The first argument is the template
+		format := string(vm.Pop().(ObjString))
+		return fmt.Sprintf(format, argVals...)
+	}
+}
+
+// File operations ----------------------------------------------
 var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
-	fileName := vm.Pop().(*ObjString).Value
+	fileName := string(vm.Pop().(ObjString))
 	file, err := os.Open(fileName)
 	if err != nil {
 		log.Panicf("Error opening file '%s'", fileName)
@@ -65,7 +105,7 @@ var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
 		if err != nil {
 			log.Panicf("Error reading file '%s'", fileName)
 		}
-		return ObjString{Value: string(file)}
+		return ObjString(file)
 	}
 	class.Fields["readall"] = FuncToNative(&fnFreadAll)
 

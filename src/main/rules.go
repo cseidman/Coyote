@@ -121,10 +121,10 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_SCAN
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROPERTY
 		//100
-		{c.Method, nil, nil, PREC_NONE}, // TOKEN_METHOD
-		{nil, nil, nil, PREC_NONE},      // TOKEN_PRIVATE
-		{nil, nil, nil, PREC_NONE},      // TOKEN_PUBLIC
-		{nil, nil, nil, PREC_NONE},      // TOKEN_PROTECTED
+		{nil, nil, nil, PREC_NONE}, // TOKEN_METHOD
+		{nil, nil, nil, PREC_NONE}, // TOKEN_PRIVATE
+		{nil, nil, nil, PREC_NONE}, // TOKEN_PUBLIC
+		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

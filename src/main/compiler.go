@@ -16,6 +16,13 @@ const (
 	MAX_MEMORY_SLOTS = 2048000
 )
 
+// Current Class. This is a cheap way to know what class we're
+// referring to when we come to a . modifier
+var CurrentClass *ClassVar
+
+// Classes
+var ClassBag = make(map[string]*ClassVar)
+
 // Keeps track of break and continue instruction locations
 type Break struct {
 	StartLoc int  // Continue will bump up to here
@@ -160,6 +167,7 @@ type Global struct {
 	datatype      ValueType
 	objtype       VarType
 	IsInitialized bool
+	Class         *ClassVar
 }
 
 var GlobalVars = make([]Global, 65000)
@@ -169,7 +177,10 @@ func AddGlobal(tok Token) int16 {
 
 	vType := GetTokenType(tok.Type)
 
-	GlobalVars[GlobalCount] = Global{tok, vType, VAR_UNKNOWN, false}
+	GlobalVars[GlobalCount].name = tok
+	GlobalVars[GlobalCount].datatype = vType
+	GlobalVars[GlobalCount].objtype = VAR_UNKNOWN
+
 	GlobalCount++
 	return GlobalCount - 1
 }
@@ -182,12 +193,14 @@ type Local struct {
 	scopeId       int
 	objtype       VarType
 	IsInitialized bool
+	Class         *ClassVar
 }
 
 type Upvalue struct {
 	Index    int16
 	IsLocal  bool
 	dataType ValueType
+	Class    *ClassVar
 }
 
 var namedRegisters = make(map[string]int16)
@@ -302,7 +315,7 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 			// it's a string
 			if c.CurrentInstructions().Constants[i].Type() == VAL_STRING {
 				// If the strings match
-				if c.CurrentInstructions().Constants[i].(*ObjString).Value == value.(*ObjString).Value {
+				if c.CurrentInstructions().Constants[i].(ObjString) == value.(ObjString) {
 					return i
 				}
 			}
@@ -354,6 +367,7 @@ func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) (int16, *Expressio
 			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
+
 			return i, &ExpressionData{Value: fn.Locals[i].dataType, ObjType: fn.Locals[i].objtype}
 		}
 	}
@@ -472,6 +486,10 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
+
+	// See if it's a class. If it is, we record it
+	// for later
+	//isClass := c.Check(TOKEN_DOT)
 
 	// Above all, check to see if this name is a built-in function
 	nativeFunction := ResolveNativeFunction(tok.ToString())
@@ -602,12 +620,11 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	if canAssign && c.Match(TOKEN_EQUAL) {
 
 		c.Expression()
-		if isHasOperand {
-			c.EmitInstr(setOp, idx)
-		} else {
-			c.EmitOp(setOp)
-		}
-
+		//if isHasOperand {
+		c.EmitInstr(setOp, idx)
+		//} else {
+		//	c.EmitOp(setOp)
+		//}
 		data := PopExpressionValue()
 		if isArray {
 			valType = data.Value
@@ -625,6 +642,11 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			GlobalVars[idx].datatype = valType
 			GlobalVars[idx].objtype = objType
 
+			if objType == VAR_CLASS {
+
+				GlobalVars[idx].Class = CurrentClass
+			}
+
 		} else if isLocal {
 			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].dataType {
 				c.Error("Cannot assign incompatible variable")
@@ -633,8 +655,16 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			c.Current.Locals[idx].IsInitialized = true
 			c.Current.Locals[idx].dataType = valType
 			c.Current.Locals[idx].objtype = objType
+
+			if objType == VAR_CLASS {
+				c.Current.Locals[idx].Class = CurrentClass
+			}
+
 		} else if isUpvalue {
 			c.Current.Upvalues[idx].dataType = valType
+			if objType == VAR_CLASS {
+				c.Current.Upvalues[idx].Class = CurrentClass
+			}
 		}
 
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
@@ -647,11 +677,21 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		if isGlobal {
 			valType = GlobalVars[idx].datatype
 			objType = GlobalVars[idx].objtype
+			if objType == VAR_CLASS {
+				CurrentClass = GlobalVars[idx].Class
+			}
+
 		} else if isLocal {
 			valType = c.Current.Locals[idx].dataType
 			objType = c.Current.Locals[idx].objtype
+			if objType == VAR_CLASS {
+				CurrentClass = c.Current.Locals[idx].Class
+			}
 		} else if isUpvalue {
 			valType = c.Current.Upvalues[idx].dataType
+			if objType == VAR_CLASS {
+				CurrentClass = c.Current.Upvalues[idx].Class
+			}
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
@@ -660,7 +700,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 }
 
 func (c *Compiler) IdentifierConstant() int16 {
-	return c.MakeConstant(&ObjString{Value: string(c.Parser.Previous.Value)})
+	return c.MakeConstant(ObjString(string(c.Parser.Previous.Value)))
 }
 
 func (c *Compiler) DefineProperty() {
@@ -670,7 +710,7 @@ func (c *Compiler) DefineProperty() {
 	var valType ValueType
 
 	c.Consume(TOKEN_COLON, "Expect ':' with type aftermethod")
-	valType = c.GetDataType()
+	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
 	}
@@ -687,7 +727,7 @@ func (c *Compiler) DefineParameter() {
 	var valType ValueType
 
 	c.Consume(TOKEN_COLON, "Expect ':' with type after parameter")
-	valType = c.GetDataType()
+	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
 	}
@@ -711,39 +751,31 @@ func (c *Compiler) DefineParameter() {
 
 }
 
-func (c *Compiler) GetDataType() ValueType {
+func (c *Compiler) GetDataType() ExpressionData {
+
+	expd := new(ExpressionData)
 
 	if c.Match(TOKEN_TYPE_INTEGER) {
-		return VAL_INTEGER
+		expd.Value = VAL_INTEGER
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_TYPE_FLOAT) {
-		return VAL_FLOAT
+		expd.Value = VAL_FLOAT
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_TYPE_STRING) {
-		return VAL_STRING
+		expd.Value = VAL_STRING
+		expd.ObjType = VAR_SCALAR
 	} else if c.Match(TOKEN_FUNC) {
-		return VAL_FUNCTION
+		expd.Value = VAL_FUNCTION
+		expd.ObjType = VAR_FUNCTION
 	} else if c.Match(TOKEN_CLASS) {
-		return VAL_CLASS
+		expd.Value = VAL_CLASS
+		expd.ObjType = VAR_CLASS
 	} else {
-		return VAL_NIL
+		c.Advance()
+		expd.Value = VAL_NIL
+		expd.ObjType = VAR_SCALAR
 	}
-
-}
-
-func (c *Compiler) GetObjType() VarType {
-
-	if c.Match(TOKEN_TYPE_INTEGER) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_FLOAT) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_STRING) {
-		return VAR_SCALAR
-	} else if c.Match(TOKEN_FUNC) {
-		return VAR_FUNCTION
-	} else if c.Match(TOKEN_ARRAY) {
-		return VAR_ARRAY
-	}
-	return VAR_UNKNOWN
-
+	return *expd
 }
 
 func (c *Compiler) DeclareVariable() {
@@ -788,13 +820,17 @@ func (c *Compiler) DeclareVariable() {
 	// on the stack as well
 	var data ExpressionData
 	if c.Match(TOKEN_EQUAL) {
+
 		c.Expression()
 		data = PopExpressionValue()
 		valType = data.Value
+
 	} else {
+
 		c.EmitOp(OP_NIL)
 		c.WriteComment("No equality token after variable declaration")
 		valType = VAL_NIL
+
 	}
 	c.EmitInstr(opcode, index)
 	PushExpressionValue(data)
@@ -810,6 +846,11 @@ func (c *Compiler) DeclareVariable() {
 		GlobalVars[index].IsInitialized = true
 		GlobalVars[index].datatype = valType
 		GlobalVars[index].objtype = data.ObjType
+
+		if data.ObjType == VAR_CLASS {
+			GlobalVars[index].Class = CurrentClass
+		}
+
 	case OP_SET_LOCAL:
 
 		if c.Current.Locals[index].IsInitialized && valType != c.Current.Locals[index].dataType {
@@ -818,6 +859,10 @@ func (c *Compiler) DeclareVariable() {
 		c.Current.Locals[index].IsInitialized = true
 		c.Current.Locals[index].dataType = valType
 		c.Current.Locals[index].objtype = data.ObjType
+		if data.ObjType == VAR_CLASS {
+			c.Current.Locals[index].Class = CurrentClass
+		}
+
 	}
 
 	c.Match(TOKEN_CR) // Remove any CR after the declaration
@@ -1057,7 +1102,7 @@ func (c *Compiler) Unary(canAssign bool) {
 	// Compile the operand.
 	c.ParsePrecedence(PREC_UNARY)
 
-	valtype := c.GetDataType()
+	valtype := c.GetDataType().Value
 
 	// Emit the operator instruction.
 	switch operatorType {
@@ -1146,6 +1191,9 @@ func (c *Compiler) Binary(canAssign bool) {
 			c.EmitOp(OP_FMULTIPLY)
 			PushExpressionValue(data)
 		} else {
+			//c.EmitOp(OP_IMULTIPLY)
+			//PushExpressionValue(data)
+			//fmt.Println("Error finding property type")
 			c.Error(fmt.Sprintf("Can't multiply! Type: %v", data.Value))
 		}
 	case TOKEN_SLASH:
@@ -1171,13 +1219,23 @@ func (c *Compiler) Binary(canAssign bool) {
 	}
 }
 
+func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ValueType {
+	for i := int16(0); i < class.PropertyCount; i++ {
+		if class.Properties[i].Name == propertyName {
+			return class.Properties[i].DataType
+		}
+	}
+	return VAL_NIL
+}
+
 func (c *Compiler) Dot(canAssign bool) {
 	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after '.'.")
 	name := c.Parser.Previous.ToString()
 
 	isMethod := c.Match(TOKEN_LEFT_PAREN) // Is this is a method?
 
-	idx := c.MakeConstant(&ObjString{name})
+	idx := c.MakeConstant(ObjString(name))
+	vType := c.FindPropertyType(CurrentClass, name)
 
 	if isMethod {
 		c.CallMethod(idx)
@@ -1194,6 +1252,11 @@ func (c *Compiler) Dot(canAssign bool) {
 			c.EmitInstr(setOp, idx)
 		} else {
 			c.EmitInstr(getOp, idx)
+			c.WriteComment(fmt.Sprintf("Name '%s' of type %s", name, ValueTypeLabel[vType]))
+			PushExpressionValue(ExpressionData{
+				Value:   vType,
+				ObjType: VAR_SCALAR,
+			})
 		}
 	}
 }
@@ -1249,10 +1312,11 @@ func (c *Compiler) Array(canAssign bool) {
 	var dType ValueType
 	for {
 		c.Expression()
+		valType := c.GetDataType().Value
 		if elements == 0 {
-			dType = c.GetDataType()
+			dType = valType
 		}
-		if dType != c.GetDataType() {
+		if dType != valType {
 			c.Error(fmt.Sprintf("Element %d is incompatible with first element type %d",
 				elements, dType))
 		}
@@ -1277,7 +1341,7 @@ func (c *Compiler) Variable(canAssign bool) {
 func (c *Compiler) String(canAssign bool) {
 	value := c.Parser.Previous.ToString()
 	// Remove the quotes
-	idx := c.MakeConstant(&ObjString{Value: value[1:(len(value) - 1)]})
+	idx := c.MakeConstant(ObjString(value[1:(len(value) - 1)]))
 	c.EmitInstr(OP_SCONST, idx)
 
 	if len(value) > 10 {
@@ -1698,15 +1762,19 @@ func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
 
 	// Name of the property
 	pName := c.Parser.Previous.ToString()
-	cIdx := c.MakeConstant(&ObjString{pName})
+	// Use this to set the property
+	idx := c.MakeConstant(ObjString(pName))
 	c.AddProperty(class, pName)
 
 	if c.Match(TOKEN_EQUAL) {
-		c.Expression()
-		c.EmitInstr(OP_BIND_PROPERTY, cIdx)
-	} else {
-		//c.EmitOp(OP_NIL)
+		if c.Match(TOKEN_METHOD) {
+			c.Method(true)
+			c.EmitInstr(OP_SET_PROPERTY, idx)
+		} else {
+
+		}
 	}
+
 }
 
 func (c *Compiler) AddProperty(class *ClassVar, name string) {
@@ -1715,11 +1783,14 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 	prop.Name = name
 	if c.Match(TOKEN_COLON) {
-		prop.ObjType = c.GetObjType()
-		prop.DataType = c.GetDataType()
+		expData := c.GetDataType()
+		prop.ObjType = expData.ObjType
+		prop.DataType = expData.Value
+
 	} else {
 		// This is a function
-		prop.ObjType = c.GetObjType()
+		//expData := c.GetDataType()
+		prop.ObjType = VAR_FUNCTION
 		prop.DataType = VAL_CLOSURE
 	}
 
@@ -1728,7 +1799,7 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 	class.PropertyCount++
 
-	class.Class.FieldCount = class.PropertyCount
+	class.Class.FieldCount = class.PropertyCount - 1
 
 }
 
@@ -1768,24 +1839,17 @@ func (c *Compiler) Class(canAssign bool) {
 	ClassId++
 	vclass.Id = ClassId
 
-	// Inherit from this class
-	if c.Match(TOKEN_AS) {
-		c.Consume(TOKEN_IDENTIFIER, "Expect a class variable name")
-		c.EmitOp(OP_SUBCLASS)
-	} else {
-		c.EmitOp(OP_NIL)
-	}
-
 	c.EmitOp(OP_CLASS)
 	PushExpressionValue(ExpressionData{
 		Value:   VAL_CLASS,
 		ObjType: VAR_CLASS,
 	})
-
+	CurrentClass = &vclass
 	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.")
 	c.ClearCR()
 	// Keep going until we identified all properties and methods
 	for !c.Match(TOKEN_RIGHT_BRACE) && !c.Match(TOKEN_EOF) {
+		CurrentClass = &vclass
 		c.ClassComponents(&vclass)
 		c.ClearCR()
 	}
@@ -1829,27 +1893,27 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 	c.BeginScope()
 
+	paramCount := int16(0)
+
 	c.Current.Locals[c.Current.LocalCount].depth = 0
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
 
-	c.Current.Locals[c.Current.LocalCount].name = "this"
+	// if it's a method, we add the current class as a parameter
+	if functionType == TYPE_METHOD {
+		c.Current.Locals[c.Current.LocalCount].name = "this"
+		c.Current.Locals[c.Current.LocalCount].dataType = VAL_CLASS
+		c.Current.Locals[c.Current.LocalCount].objtype = VAR_CLASS
+		c.Current.Locals[c.Current.LocalCount].Class = CurrentClass
+		paramCount++
+	}
 
 	// Set up the locals for this function
 	c.Current.LocalCount++
-
-	paramCount := int16(0)
 
 	// Parenthesis and parameter definition
 
 	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after function definition.")
 	// Here we just count the parameters
-
-	// if it's a method, we add the current class as a parameter
-	if functionType == TYPE_METHOD || functionType == TYPE_FUNCTION {
-		index := c.AddLocal("this")
-		c.Current.Locals[index].dataType = VAL_CLASS
-		paramCount++
-	}
 
 	if !c.Check(TOKEN_RIGHT_PAREN) {
 		for {
@@ -1869,7 +1933,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 	// If there is a return value, then declare it here
 	isReturnValue := false
-	c.Current.returnType = c.GetDataType()
+	c.Current.returnType = c.GetDataType().Value
 	if c.Current.returnType != VAL_NIL {
 		isReturnValue = true
 	}
@@ -1935,8 +1999,6 @@ func (c *Compiler) Statement() {
 		//c.CreateStatement()
 	} else if c.Match(TOKEN_INCLUDE) {
 		//c.IncludeStatement()
-	} else if c.Match(TOKEN_PRINT) {
-		c.PrintStatement()
 	} else if c.Match(TOKEN_IF) {
 		c.IfStatement()
 	} else if c.Match(TOKEN_RETURN) {
@@ -1964,12 +2026,6 @@ func (c *Compiler) Statement() {
 	} else {
 		c.ExpressionStatement()
 	}
-}
-
-func (c *Compiler) PrintStatement() {
-	c.Expression()
-	c.Consume(TOKEN_CR, "Expect 'CR' after value.")
-	c.EmitOp(OP_PRINT)
 }
 
 func (c *Compiler) Evaluate() {
