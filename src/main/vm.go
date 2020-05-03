@@ -722,20 +722,21 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_LIST:
 
-		keyCount := int64(*v.Pop().(*ObjInteger))
+		keyCount := int64(v.Pop().(ObjInteger))
 		keyType := v.GetByte()
 
-		var lObj = new(ObjList)
+		lObj := new(ObjList)
 		lObj.Init(ValueType(keyType), int(keyCount))
 		for i := int64(0); i < keyCount; i++ {
 			val := v.Pop()
 			key := v.Pop()
 			lObj.AddNew(key, val) // Key, Value
+			fmt.Printf("Added %d\n", i)
 		}
 		v.Push(lObj)
 
 	case OP_ARRAY:
-		elements := *v.Pop().(*ObjInteger)
+		elements := v.Pop().(ObjInteger)
 		dType := byte(v.GetOperandValue())
 
 		o := make([]Obj, elements)
@@ -751,14 +752,14 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Scan()
 
 	case OP_ASIZE:
-		array := v.Peek(1).(*ObjArray)
+		array := v.Peek(1).(ObjArray)
 		v.Push(ObjInteger(int64(array.ElementCount)))
 
 	case OP_AINDEX:
-		index := v.Peek(0).(*ObjInteger)
-		array := v.Peek(1).(*ObjArray)
+		index := v.Peek(0).(ObjInteger)
+		array := v.Peek(1).(ObjArray)
 
-		v.Push(array.Elements[int64(*index)])
+		v.Push(array.Elements[int64(index)])
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

@@ -43,7 +43,15 @@ var AddIt NativeFn = func(vm *VM, args int, argpos int) Obj {
 // Print operations -------------------------------------------
 var Outf NativeFn = func(vm *VM, args int, argpos int) Obj {
 	// If there's only one parameter the print as is
-	fmt.Print(formattedValue(vm, args))
+	//fmt.Printf(formattedValue(vm, args))
+	argVals := make([]interface{}, args-1)
+	for i := args - 1; i > 0; i-- {
+		argVals[i-1] = vm.Pop().ToValue()
+	}
+	// The first argument is the template
+	format := string(vm.Pop().(ObjString))
+	fmt.Printf(format, argVals...)
+
 	return nil
 }
 
@@ -61,7 +69,8 @@ var Outln NativeFn = func(vm *VM, args int, argpos int) Obj {
 
 // Supporting function
 func formattedValue(vm *VM, args int) string {
-	if args == 0 {
+
+	if args == 1 {
 		x := vm.Pop()
 		return fmt.Sprint(x.ShowValue())
 	} else {
@@ -70,7 +79,7 @@ func formattedValue(vm *VM, args int) string {
 			argVals[i-1] = vm.Pop().ToValue()
 		}
 		// The first argument is the template
-		format := string(vm.Pop().(ObjString))
+		format := string(vm.Pop().ToBytes())
 		return fmt.Sprintf(format, argVals...)
 	}
 }

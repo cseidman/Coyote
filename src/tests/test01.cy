@@ -1,4 +1,5 @@
 // Test variables and scope
+println("Variables *****************")
 var x
 x = 10
 println("Test var with deferred assignment completed")

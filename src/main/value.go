@@ -179,7 +179,7 @@ func (l ObjList) Type() ValueType      { return VAL_LIST }
 func (l ObjList) ToBytes() []byte      { return nil }
 func (l ObjList) ToValue() interface{} { return l.List }
 
-func (l ObjList) Init(keyType ValueType, elementCount int) {
+func (l *ObjList) Init(keyType ValueType, elementCount int) {
 	l.ElementCount = elementCount
 	l.KeyType = keyType
 	l.List = make(map[HashKey]Obj)
@@ -187,24 +187,23 @@ func (l ObjList) Init(keyType ValueType, elementCount int) {
 
 func (l ObjList) GetValue(obj Obj) Obj {
 	if obj.Type() == VAL_STRING {
-		return l.List[obj.(*ObjString).HashValue()]
+		return l.List[obj.(ObjString).HashValue()]
 	} else {
 		return nil
 	}
-
 }
 
 func (l ObjList) AddNew(key Obj, val Obj) {
-	l.List[key.(*ObjString).HashValue()] = val
+	l.List[key.(ObjString).HashValue()] = val
 }
 
 func (l ObjList) SetValue(obj Obj, val Obj) {
 	var hVal HashKey
 	switch l.KeyType {
 	case VAL_INTEGER:
-		hVal = obj.(*ObjInteger).HashValue()
+		hVal = obj.(ObjInteger).HashValue()
 	case VAL_STRING:
-		hVal = obj.(*ObjString).HashValue()
+		hVal = obj.(ObjString).HashValue()
 	}
 	l.List[hVal] = val
 }
@@ -330,9 +329,9 @@ func (s ObjString) Type() ValueType      { return VAL_STRING }
 func (s ObjString) ToBytes() []byte      { return []byte(s) }
 func (s ObjString) ToValue() interface{} { return s }
 
-func (s *ObjString) HashValue() HashKey {
+func (s ObjString) HashValue() HashKey {
 	bw := fnv.New64a()
-	_, _ = bw.Write([]byte(*s))
+	_, _ = bw.Write([]byte(s))
 	return HashKey{
 		Type:      VAL_STRING,
 		HashValue: bw.Sum64(),

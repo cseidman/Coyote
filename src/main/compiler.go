@@ -483,13 +483,17 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 	return -1, nil
 }
 
+func (c *Compiler) NamedLocalClassVariable(idx int16) {
+
+}
+
+func (c *Compiler) NamedGlobalClassVariable(idx int16) {
+
+}
+
 func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
-
-	// See if it's a class. If it is, we record it
-	// for later
-	//isClass := c.Check(TOKEN_DOT)
 
 	// Above all, check to see if this name is a built-in function
 	nativeFunction := ResolveNativeFunction(tok.ToString())
@@ -1335,9 +1339,63 @@ func (c *Compiler) Array(canAssign bool) {
 
 }
 func (c *Compiler) Index(canAssign bool) {}
+
+func (c *Compiler) CompoundVariable() {
+	//Find out what kind of variable this is
+	// First lets get the name
+	tok := &c.Parser.Previous
+	name := tok.ToString()
+
+	idx, expData := c.ResolveLocal(c.Current, name)
+
+	// It's a local
+	if idx != -1 {
+		switch expData.ObjType {
+		// Is it a class?
+		case VAR_CLASS:
+			// Then treat this as a Class
+
+		}
+		return
+	}
+
+	// It's a global
+	idx, expData = c.ResolveGlobal(tok)
+	if idx != -1 {
+		switch expData.ObjType {
+		case VAR_CLASS:
+			// Treat this as a Class
+		}
+		return
+	}
+
+}
+
 func (c *Compiler) Variable(canAssign bool) {
+	/*
+		// This is a compound variable pulling from a class, enum, or
+		// any other .Property type variable. We know this because the
+		// next token is a dot
+		firstPass := true // This tells if we came off of the rules
+		for c.Check(TOKEN_DOT) {
+			// If this after the first time, we need to get the
+			// next variable. At the first pass, we already have the first
+			// variable in the parse flow
+			if !firstPass {
+				// If there are no more identifiers, we break
+				if !c.Match(TOKEN_IDENTIFIER) {
+					break
+				}
+			}
+			firstPass = false
+			// This is the variable we're going to evaluate
+			// By now we've already evaluated a variable
+			c.CompoundVariable()
+		}
+	*/
 	c.NamedVariable(canAssign)
 }
+
 func (c *Compiler) String(canAssign bool) {
 	value := c.Parser.Previous.ToString()
 	// Remove the quotes
