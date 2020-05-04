@@ -420,6 +420,10 @@ func (o ObjEnum) Type() ValueType      { return VAL_ENUM }
 func (o ObjEnum) ToBytes() []byte      { return nil }
 func (o ObjEnum) ToValue() interface{} { return nil }
 
+func (o ObjEnum) GetItem(tag string) ObjByte {
+	return o.Data[tag]
+}
+
 // Utility functions
 func MakeStringObj(str string) *ObjString {
 	s := ObjString(str)

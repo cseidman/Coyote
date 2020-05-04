@@ -767,10 +767,15 @@ func (v *VM) Dispatch(opCode byte) {
 			ElementCount: elements,
 			Data:         make(map[string]ObjByte, elements),
 		}
-		for i := int16(0); i < elements; i++ {
+		for i := elements - 1; i >= 0; i-- {
 			enumObj.Data[string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))] = ObjByte{byte(i)}
 		}
 		v.Push(&enumObj)
+
+	case OP_ENUM_TAG:
+		key := string(v.GetOperand().(ObjString))
+		enumObj := v.Peek(1).(*ObjEnum)
+		v.Push(enumObj.GetItem(key))
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

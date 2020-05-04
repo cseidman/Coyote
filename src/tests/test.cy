@@ -17,4 +17,6 @@ THREE,
 FOUR
 }
 
+print(x.TWO)
+
 

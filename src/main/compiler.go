@@ -1324,6 +1324,10 @@ func (c *Compiler) Enum(canAssign bool) {
 	}
 	c.Consume(TOKEN_RIGHT_BRACE, "Expect '}' to close enum definition")
 	c.EmitInstr(OP_ENUM, int16(elements))
+	PushExpressionValue(ExpressionData{
+		Value:   VAL_ENUM,
+		ObjType: VAR_ENUM,
+	})
 }
 
 func (c *Compiler) Array(canAssign bool) {
@@ -1454,7 +1458,7 @@ func (c *Compiler) Variable(canAssign bool) {
 				}
 			}
 		case VAR_ENUM:
-
+			c.EmitInstr(OP_ENUM_TAG, idx)
 		default:
 			// Uh oh ..
 			c.Error(fmt.Sprintf("Variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
