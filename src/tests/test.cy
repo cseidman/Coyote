@@ -4,7 +4,10 @@ println(tt)
 var t = class {
     a:int
     b = method(x:int,y:int) int {
-        return (x+y)*this.a
+        return this.c(x+y)
+    }
+    c = method(x:int) int {
+        return x * this.a
     }
 }
 t.a = 2
