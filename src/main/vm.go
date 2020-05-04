@@ -761,6 +761,17 @@ func (v *VM) Dispatch(opCode byte) {
 
 		v.Push(array.Elements[int64(index)])
 
+	case OP_ENUM:
+		elements := v.GetOperandValue()
+		enumObj := ObjEnum{
+			ElementCount: elements,
+			Data:         make(map[string]ObjByte, elements),
+		}
+		for i := int16(0); i < elements; i++ {
+			enumObj.Data[string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))] = ObjByte{byte(i)}
+		}
+		v.Push(&enumObj)
+
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
 		return

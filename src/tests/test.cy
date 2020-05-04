@@ -10,3 +10,11 @@ var t = class {
 t.a = 2
 println(t.b(5,4))
 
+var x = enum{
+ONE,
+TWO,
+THREE,
+FOUR
+}
+
+

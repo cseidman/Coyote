@@ -1304,15 +1304,25 @@ func (c *Compiler) List(canAssign bool) {
 
 func (c *Compiler) Enum(canAssign bool) {
 	elements := uint8(0)
+	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' after 'enum'")
+	c.ClearCR()
 	for {
-		if !c.Match(TOKEN_IDENTIFIER) {
-			break
-		}
+		c.Consume(TOKEN_IDENTIFIER, "Expect enum element")
+		name := c.Parser.Previous.ToString()
+		idx := c.MakeConstant(ObjString(name))
+		c.EmitInstr(OP_PUSH, idx)
 		elements++
 		if elements > 255 {
 			c.Error("Enums cannot have more than 255 elements")
 		}
+		c.ClearCR()
+		if !c.Match(TOKEN_COMMA) {
+			break
+		}
+
+		c.ClearCR()
 	}
+	c.Consume(TOKEN_RIGHT_BRACE, "Expect '}' to close enum definition")
 	c.EmitInstr(OP_ENUM, int16(elements))
 }
 
@@ -1366,11 +1376,16 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 		// Is it a class?
 		case VAR_CLASS:
 			// Then treat this as a Class
-			fmt.Println("Local class")
 			c.EmitInstr(OP_GET_LOCAL, idx)
 			return &ExpressionData{
 				Value:   VAL_CLASS,
 				ObjType: VAR_CLASS,
+			}
+		case VAR_ENUM:
+			c.EmitInstr(OP_GET_LOCAL, idx)
+			return &ExpressionData{
+				Value:   VAL_ENUM,
+				ObjType: VAR_ENUM,
 			}
 		}
 
@@ -1382,11 +1397,16 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 		switch expData.ObjType {
 		case VAR_CLASS:
 			// Treat this as a Class
-			fmt.Println("Global class")
 			c.EmitInstr(OP_GET_GLOBAL, idx)
 			return &ExpressionData{
 				Value:   VAL_CLASS,
 				ObjType: VAR_CLASS,
+			}
+		case VAR_ENUM:
+			c.EmitInstr(OP_GET_GLOBAL, idx)
+			return &ExpressionData{
+				Value:   VAL_ENUM,
+				ObjType: VAR_ENUM,
 			}
 		}
 		fmt.Printf("%s Class type: %s\n", name, VarTypeLabel[expData.ObjType])
@@ -1433,6 +1453,8 @@ func (c *Compiler) Variable(canAssign bool) {
 					c.EmitInstr(OP_GET_PROPERTY, idx)
 				}
 			}
+		case VAR_ENUM:
+
 		default:
 			// Uh oh ..
 			c.Error(fmt.Sprintf("Variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
