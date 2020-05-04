@@ -122,6 +122,7 @@ const (
 	OP_GET_GLOBAL_4
 	OP_GET_GLOBAL_5
 	OP_CALL_NATIVE
+	OP_ENUM
 )
 
 var OpLabel = map[byte]string{
@@ -270,4 +271,5 @@ var OpLabel = map[byte]string{
 
 	OP_GET_GLOBAL_5: "OP_GET_GLOBAL_5",
 	OP_CALL_NATIVE:  "OP_CALL_NATIVE",
+	OP_ENUM:         "OP_ENUM",
 }

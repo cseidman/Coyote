@@ -410,7 +410,22 @@ func (a ObjArray) GetElement(element int64) Obj {
 	return a.Elements[element]
 }
 
-type ObjEnum struct {
+type ObjEnum map[string]ObjByte
+
+func (o ObjEnum) ShowValue() string {
+	return "<Enum>"
+}
+
+func (o ObjEnum) Type() ValueType {
+	return VAL_ENUM
+}
+
+func (o ObjEnum) ToBytes() []byte {
+	return nil
+}
+
+func (o ObjEnum) ToValue() interface{} {
+	return nil
 }
 
 // Utility functions

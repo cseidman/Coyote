@@ -58,12 +58,14 @@ var Outf NativeFn = func(vm *VM, args int, argpos int) Obj {
 var Out NativeFn = func(vm *VM, args int, argpos int) Obj {
 	x := vm.Pop()
 	fmt.Print(x.ShowValue())
+	vm.sp--
 	return nil
 }
 
 var Outln NativeFn = func(vm *VM, args int, argpos int) Obj {
 	x := vm.Pop()
 	fmt.Println(x.ShowValue())
+	vm.sp--
 	return nil
 }
 

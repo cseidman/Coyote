@@ -150,7 +150,7 @@ func (v *VM) CallNative() {
 func (v *VM) MethodCall() {
 
 	idx := string(v.GetOperand().(ObjString))
-	argCount := int(v.GetOperandValue()) - 1
+	argCount := int(v.GetOperandValue())
 	classInst := v.Peek(argCount).(*ObjClass)
 
 	fld := classInst.Fields[idx]

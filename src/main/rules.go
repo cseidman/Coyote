@@ -17,7 +17,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_INDEX},          // TOKEN_LEFT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_COMMA
-		{nil, c.Dot, nil, PREC_CALL},         // TOKEN_DOT
+		{nil, nil, nil, PREC_CALL},           // TOKEN_DOT
 		{c.Unary, c.Binary, nil, PREC_TERM},  // TOKEN_MINUS
 		{nil, c.Binary, nil, PREC_TERM},      // TOKEN_PLUS
 		{nil, nil, nil, PREC_NONE},           // TOKEN_SEMICOLON
@@ -63,11 +63,10 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},        // TOKEN_IF
 		{c.Literal, nil, nil, PREC_NONE},  // TOKEN_NIL
 		{nil, c.or_, nil, PREC_OR},        // TOKEN_OR
-		/*{nil, nil, nil, PREC_NONE},        // TOKEN_PRINT*/
-		{nil, nil, nil, PREC_NONE}, // TOKEN_RETURN
+		{nil, nil, nil, PREC_NONE},        // TOKEN_RETURN
+		{nil, nil, nil, PREC_NONE},        // TOKEN_SUPER
 		// 50
-		{nil, nil, nil, PREC_NONE},       // TOKEN_SUPER
-		{c.this_, nil, nil, PREC_NONE},   // TOKEN_THIS
+		{c.Enum, nil, nil, PREC_NONE},    // TOKEN_ENUM
 		{c.Boolean, nil, nil, PREC_NONE}, // TOKEN_TRUE
 		{nil, nil, nil, PREC_NONE},       // TOKEN_VAR
 		{nil, nil, nil, PREC_NONE},       // TOKEN_WHILE
@@ -76,8 +75,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},       // TOKEN_INCLUDE
 		{nil, nil, nil, PREC_NONE},       // TOKEN_INTEGER
 		{nil, nil, nil, PREC_NONE},       // TOKEN_FLOAT
+		{nil, nil, nil, PREC_NONE},       // TOKEN_BOOL
 		// 60
-		{nil, nil, nil, PREC_NONE},         // TOKEN_BOOL
 		{nil, nil, nil, PREC_NONE},         // TOKEN_STRING
 		{nil, nil, nil, PREC_NONE},         // TOKEN_ARRAY
 		{c.SqlSelect, nil, nil, PREC_NONE}, // TOKEN_SELECT
@@ -87,8 +86,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},         // TOKEN_FROM
 		{nil, nil, nil, PREC_NONE},         // TOKEN_JOIN
 		{nil, nil, nil, PREC_NONE},         // TOKEN_LEFT
+		{nil, nil, nil, PREC_NONE},         // TOKEN_RIGHT
 		// 70
-		{nil, nil, nil, PREC_NONE}, // TOKEN_RIGHT
 		{nil, nil, nil, PREC_NONE}, // TOKEN_CROSSJOIN
 		{nil, nil, nil, PREC_NONE}, // TOKEN_WHERE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_ALL
@@ -98,8 +97,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_INTO
 		{nil, nil, nil, PREC_NONE}, // TOKEN_VALUES
 		{nil, nil, nil, PREC_NONE}, // TOKEN_AS
+		{nil, nil, nil, PREC_NONE}, // TOKEN_ON
 		// 80
-		{nil, nil, nil, PREC_NONE},      // TOKEN_ON
 		{c.Browse, nil, nil, PREC_NONE}, // TOKEN_BROWSE
 		{nil, nil, nil, PREC_NONE},      // TOKEN_CREATE
 		{nil, nil, nil, PREC_NONE},      // TOKEN_TABLE
@@ -109,8 +108,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},      // TOKEN_HAVING
 		{nil, nil, nil, PREC_NONE},      // TOKEN_DISTINCT
 		{nil, nil, nil, PREC_NONE},      // TOKEN_TOP
+		{nil, nil, nil, PREC_NONE},      // TOKEN_STEP
 		// 90
-		{nil, nil, nil, PREC_NONE}, // TOKEN_STEP
 		{nil, nil, nil, PREC_NONE}, // TOKEN_TO
 		{nil, nil, nil, PREC_NONE}, // TOKEN_WHEN
 		{nil, nil, nil, PREC_NONE}, // TOKEN_CASE
@@ -120,8 +119,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_CONTINUE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_SCAN
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROPERTY
-		//100
 		{nil, nil, nil, PREC_NONE}, // TOKEN_METHOD
+		//100
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PRIVATE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PUBLIC
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED

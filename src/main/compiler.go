@@ -483,14 +483,6 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 	return -1, nil
 }
 
-func (c *Compiler) NamedLocalClassVariable(idx int16) {
-
-}
-
-func (c *Compiler) NamedGlobalClassVariable(idx int16) {
-
-}
-
 func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
@@ -1310,6 +1302,20 @@ func (c *Compiler) List(canAssign bool) {
 	c.WriteComment(fmt.Sprintf("List with %d elements type %s=%s", keys, ValueTypeLabel[keyType], ValueTypeLabel[dType]))
 }
 
+func (c *Compiler) Enum(canAssign bool) {
+	elements := uint8(0)
+	for {
+		if !c.Match(TOKEN_IDENTIFIER) {
+			break
+		}
+		elements++
+		if elements > 255 {
+			c.Error("Enums cannot have more than 255 elements")
+		}
+	}
+	c.EmitInstr(OP_ENUM, int16(elements))
+}
+
 func (c *Compiler) Array(canAssign bool) {
 	// Find how many items are in this array
 	elements := int16(0)
@@ -1340,11 +1346,17 @@ func (c *Compiler) Array(canAssign bool) {
 }
 func (c *Compiler) Index(canAssign bool) {}
 
-func (c *Compiler) CompoundVariable() {
-	//Find out what kind of variable this is
-	// First lets get the name
-	tok := &c.Parser.Previous
+func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
+
 	name := tok.ToString()
+
+	if name == "this" {
+		c.EmitOp(OP_GET_LOCAL_0)
+		return &ExpressionData{
+			Value:   VAL_CLASS,
+			ObjType: VAR_CLASS,
+		}
+	}
 
 	idx, expData := c.ResolveLocal(c.Current, name)
 
@@ -1354,9 +1366,14 @@ func (c *Compiler) CompoundVariable() {
 		// Is it a class?
 		case VAR_CLASS:
 			// Then treat this as a Class
-
+			fmt.Println("Local class")
+			c.EmitInstr(OP_GET_LOCAL, idx)
+			return &ExpressionData{
+				Value:   VAL_CLASS,
+				ObjType: VAR_CLASS,
+			}
 		}
-		return
+
 	}
 
 	// It's a global
@@ -1365,35 +1382,68 @@ func (c *Compiler) CompoundVariable() {
 		switch expData.ObjType {
 		case VAR_CLASS:
 			// Treat this as a Class
+			fmt.Println("Global class")
+			c.EmitInstr(OP_GET_GLOBAL, idx)
+			return &ExpressionData{
+				Value:   VAL_CLASS,
+				ObjType: VAR_CLASS,
+			}
 		}
-		return
+		fmt.Printf("%s Class type: %s\n", name, VarTypeLabel[expData.ObjType])
 	}
-
+	fmt.Printf("Compound variable '%s' not found\n", name)
+	return nil
 }
 
 func (c *Compiler) Variable(canAssign bool) {
-	/*
-		// This is a compound variable pulling from a class, enum, or
-		// any other .Property type variable. We know this because the
-		// next token is a dot
-		firstPass := true // This tells if we came off of the rules
-		for c.Check(TOKEN_DOT) {
-			// If this after the first time, we need to get the
-			// next variable. At the first pass, we already have the first
-			// variable in the parse flow
-			if !firstPass {
-				// If there are no more identifiers, we break
-				if !c.Match(TOKEN_IDENTIFIER) {
-					break
+
+	tok := &c.Parser.Previous
+
+	var expData *ExpressionData
+
+	var foundCompoundObject bool
+
+	// In the first pass, we check to see if it's a compound variable
+	for c.Check(TOKEN_DOT) {
+		foundCompoundObject = true
+		// It is and so now we check to see what kind it is
+		expData = c.CompoundVariable(tok)
+		// Now we get the property
+		c.Consume(TOKEN_DOT, "Expect '.' after object name")
+		c.Consume(TOKEN_IDENTIFIER, "Expect name after '.'")
+
+		tok = &c.Parser.Previous
+		idx := c.MakeConstant(ObjString(tok.ToString()))
+
+		switch expData.ObjType {
+		case VAR_CLASS:
+
+			if c.Match(TOKEN_LEFT_PAREN) {
+				// This is a method
+				args := c.GetArguments()
+				c.EmitInstr(OP_CALL_METHOD, idx)
+				c.EmitOperand(args)
+			} else {
+
+				// It's a class, so let's manage that
+				if c.Match(TOKEN_EQUAL) {
+					c.Expression()
+					c.EmitInstr(OP_SET_PROPERTY, idx)
+				} else {
+					c.EmitInstr(OP_GET_PROPERTY, idx)
 				}
 			}
-			firstPass = false
-			// This is the variable we're going to evaluate
-			// By now we've already evaluated a variable
-			c.CompoundVariable()
+		default:
+			// Uh oh ..
+			c.Error(fmt.Sprintf("Variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
 		}
-	*/
-	c.NamedVariable(canAssign)
+
+	}
+
+	if !foundCompoundObject {
+		c.NamedVariable(canAssign)
+	}
+
 }
 
 func (c *Compiler) String(canAssign bool) {
@@ -1898,10 +1948,7 @@ func (c *Compiler) Class(canAssign bool) {
 	vclass.Id = ClassId
 
 	c.EmitOp(OP_CLASS)
-	PushExpressionValue(ExpressionData{
-		Value:   VAL_CLASS,
-		ObjType: VAR_CLASS,
-	})
+
 	CurrentClass = &vclass
 	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.")
 	c.ClearCR()
@@ -1912,7 +1959,10 @@ func (c *Compiler) Class(canAssign bool) {
 		c.ClearCR()
 	}
 	c.ClearCR()
-
+	PushExpressionValue(ExpressionData{
+		Value:   VAL_CLASS,
+		ObjType: VAR_CLASS,
+	})
 	ClassId--
 
 }
