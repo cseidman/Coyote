@@ -775,6 +775,7 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_ENUM_TAG:
 		key := string(v.GetOperand().(ObjString))
 		enumObj := v.Peek(1).(*ObjEnum)
+		v.sp--
 		v.Push(enumObj.GetItem(key))
 
 	default:
