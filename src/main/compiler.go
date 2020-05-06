@@ -483,6 +483,10 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 	return -1, nil
 }
 
+func (c *Compiler) NamedList(tok Token) {
+
+}
+
 func (c *Compiler) NamedArray(tok Token) {
 	// Needs to return an integer
 	c.Expression()
