@@ -637,11 +637,11 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_SET_ALOCAL:
 		slot := v.GetOperandValue()
 		val := v.Peek(0)
-		elem := int64(*v.Pop().(*ObjInteger))
-		v.Stack[slot].(*ObjArray).Elements[elem] = val
+		elem := int64(v.Pop().(ObjInteger))
+		v.Stack[slot].(ObjArray).Elements[elem] = val
 
 	case OP_GET_AGLOBAL:
-		elem := int64(*v.Pop().(*ObjInteger))
+		elem := int64(v.Pop().(ObjInteger))
 		idx := v.GetOperandValue()
 		v.Push(v.Globals[idx].(*ObjArray).Elements[elem])
 

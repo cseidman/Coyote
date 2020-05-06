@@ -97,3 +97,11 @@ const (
 	PROPERTY ClassComponentType = iota
 	METHOD
 )
+
+type VariableScope byte
+const (
+	GLOBAL VariableScope=iota
+	LOCAL
+	UPVALUE
+	REGISTER
+)

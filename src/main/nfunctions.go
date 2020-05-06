@@ -20,6 +20,7 @@ func RegisterFunctions() {
 	RegisterNative("println", Outln)
 	RegisterNative("printf", Outf)
 	RegisterNative("Matrix", Matrix)
+	RegisterNative("newarray", array)
 }
 
 func ResolveNativeFunction(name string) *ObjNative {

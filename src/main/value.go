@@ -374,7 +374,7 @@ func (b ObjBool) HashValue() HashKey {
 func (a ObjArray) ShowValue() string {
 	strVal := "|"
 	for i := a.ElementCount - 1; i >= 0; i-- {
-		strVal = strVal + a.Elements[i].ShowValue() + "|"
+		//strVal = strVal + a.Elements[i].ShowValue() + "|"
 	}
 	return strVal
 }

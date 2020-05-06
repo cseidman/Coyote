@@ -1,2 +1,4 @@
 go build -o coyote.exe
-coyote -f ../tests/test01.cy
+rem coyote -f ../tests/variables.cy
+coyote -f ../tests/arrays.cy -debug
+rem coyote -f ../tests/enums.cy

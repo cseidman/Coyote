@@ -483,6 +483,24 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 	return -1, nil
 }
 
+
+
+func (c *Compiler) NamedArray() {
+	hasIndex = true
+	c.Expression()
+	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
+	idx, exprValue := c.ResolveLocal(c.Current, tok.ToString())
+	if c.Match(TOKEN_EQUAL) {
+		c.EmitInstr(OP_SET)
+	} else {
+
+	}
+}
+
+func (c *Compiler) ResolveVariable(tok Token) (int16, ExpressionData, VariableScope) {
+
+}
+
 func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
@@ -512,9 +530,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 	// Get the index value and pop it on to the stack
 	if c.Match(TOKEN_LEFT_BRACKET) {
-		hasIndex = true
-		c.Expression()
-		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
+		c.NamedArray()
 	}
 
 	// If it's a local variable, we look for that before globals
@@ -751,27 +767,31 @@ func (c *Compiler) GetDataType() ExpressionData {
 
 	expd := new(ExpressionData)
 
-	if c.Match(TOKEN_TYPE_INTEGER) {
+	if c.Check(TOKEN_TYPE_INTEGER) {
 		expd.Value = VAL_INTEGER
 		expd.ObjType = VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_FLOAT) {
+	} else if c.Check(TOKEN_TYPE_FLOAT) {
 		expd.Value = VAL_FLOAT
 		expd.ObjType = VAR_SCALAR
-	} else if c.Match(TOKEN_TYPE_STRING) {
+	} else if c.Check(TOKEN_TYPE_STRING) {
 		expd.Value = VAL_STRING
 		expd.ObjType = VAR_SCALAR
-	} else if c.Match(TOKEN_FUNC) {
+	} else if c.Check(TOKEN_FUNC) {
 		expd.Value = VAL_FUNCTION
 		expd.ObjType = VAR_FUNCTION
-	} else if c.Match(TOKEN_CLASS) {
+	} else if c.Check(TOKEN_CLASS) {
 		expd.Value = VAL_CLASS
 		expd.ObjType = VAR_CLASS
 	} else {
-		c.Advance()
+		//c.Advance()
 		expd.Value = VAL_NIL
 		expd.ObjType = VAR_SCALAR
 	}
 	return *expd
+}
+
+func (c *Compiler) _array(canAssign bool) {
+	//array()
 }
 
 func (c *Compiler) DeclareVariable() {
@@ -1334,6 +1354,7 @@ func (c *Compiler) Array(canAssign bool) {
 	// Find how many items are in this array
 	elements := int16(0)
 	var dType ValueType
+
 	for {
 		c.Expression()
 		valType := c.GetDataType().Value
@@ -1349,6 +1370,7 @@ func (c *Compiler) Array(canAssign bool) {
 			break
 		}
 	}
+
 	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
 	c.EmitInstr(OP_PUSH, elements)
 	c.EmitInstr(OP_ARRAY, int16(dType))
@@ -2168,6 +2190,11 @@ func (c *Compiler) Evaluate() {
 
 func (c *Compiler) WriteComment(comment string) {
 	c.CurrentInstructions().WriteComment(comment)
+}
+
+func (c *Compiler) IntegerType(canAssign bool) {
+	c.EmitInstr(OP_PUSH,int16(VAL_INTEGER))
+	c.WriteComment("Push the integer type to the stack")
 }
 
 func GetTokenType(tokType TokenType) ValueType {

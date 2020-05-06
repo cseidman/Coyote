@@ -73,12 +73,12 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},       // TOKEN_ERROR
 		{nil, nil, nil, PREC_NONE},       // TOKEN_EOF
 		{nil, nil, nil, PREC_NONE},       // TOKEN_INCLUDE
-		{nil, nil, nil, PREC_NONE},       // TOKEN_INTEGER
-		{nil, nil, nil, PREC_NONE},       // TOKEN_FLOAT
-		{nil, nil, nil, PREC_NONE},       // TOKEN_BOOL
+		{c.IntegerType, nil, nil, PREC_NONE},       // TOKEN_TYPE_INTEGER
+		{nil, nil, nil, PREC_NONE},       // TOKEN_TYPE_FLOAT
+		{nil, nil, nil, PREC_NONE},       // TOKEN_TYPE_BOOL
 		// 60
-		{nil, nil, nil, PREC_NONE},         // TOKEN_STRING
-		{nil, nil, nil, PREC_NONE},         // TOKEN_ARRAY
+		{nil, nil, nil, PREC_NONE},         // TOKEN_TYPE_STRING
+		{c._array, nil, nil, PREC_NONE},    // TOKEN_TYPE_ARRAY
 		{c.SqlSelect, nil, nil, PREC_NONE}, // TOKEN_SELECT
 		{nil, nil, nil, PREC_NONE},         // TOKEN_INSERT
 		{nil, nil, nil, PREC_NONE},         // TOKEN_UPDATE

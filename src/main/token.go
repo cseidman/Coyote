@@ -125,8 +125,8 @@ const (
 	TOKEN_CONTINUE
 	TOKEN_SCAN
 	TOKEN_PROPERTY
-	// 100
 	TOKEN_METHOD
+	// 100
 	TOKEN_PRIVATE
 	TOKEN_PUBLIC
 	TOKEN_PROTECTED
@@ -201,7 +201,7 @@ var TokenLabels = map[string]TokenProperties{
 	"float":   {TOKEN_TYPE_FLOAT, true},
 	"bool":    {TOKEN_TYPE_BOOL, true},
 	"string":  {TOKEN_TYPE_STRING, true},
-	"array":   {TOKEN_TYPE_ARRAY, true},
+	"_array":   {TOKEN_TYPE_ARRAY, true},
 	"insert":  {TOKEN_INSERT, false},
 	"update":  {TOKEN_UPDATE, false},
 	"delete":  {TOKEN_DELETE, false},
