@@ -2,29 +2,39 @@ package main
 
 import (
 	"gonum.org/v1/gonum/mat"
-	"fmt"
 )
 
 type ObjMatrix struct {
 	Data mat.Matrix
 }
 
-func MakeDense() {
-
-	x := &ObjMatrix{
-		Data: mat.NewDense(3, 5, nil),
-	}
-	fmt.Println(x)
+func (o ObjMatrix) ShowValue() string {
+	panic("implement me")
 }
 
-var Maxtrix NativeFn = func(vm *VM, args int, argpos int) Obj {
+func (o ObjMatrix) Type() ValueType {
+	panic("implement me")
+}
 
-	dataArray := vm.Pop()
-	cols := vm.Pop()
-	rows := vm.Pop()
+func (o ObjMatrix) ToBytes() []byte {
+	panic("implement me")
+}
 
-	for i := args - 1; i > 0; i-- {
-		argVals[i-1] = vm.Pop().ToValue()
+func (o ObjMatrix) ToValue() interface{} {
+	panic("implement me")
+}
+
+var Matrix NativeFn = func(vm *VM, args int, argpos int) Obj {
+
+	dataArray := vm.Pop().(ObjArray)
+	cols := int(vm.Pop().(ObjInteger))
+	rows := int(vm.Pop().(ObjInteger))
+
+	ar := make([]float64, dataArray.ElementCount)
+	for i := 0; i < dataArray.ElementCount; i++ {
+		ar[i] = float64(dataArray.Elements[i].(ObjFloat))
 	}
-
+	return ObjMatrix{
+		Data: mat.NewDense(rows, cols, ar),
+	}
 }
