@@ -483,22 +483,54 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 	return -1, nil
 }
 
-
-
-func (c *Compiler) NamedArray() {
-	hasIndex = true
+func (c *Compiler) NamedArray(tok Token) {
+	// Needs to return an integer
 	c.Expression()
-	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
-	idx, exprValue := c.ResolveLocal(c.Current, tok.ToString())
-	if c.Match(TOKEN_EQUAL) {
-		c.EmitInstr(OP_SET)
-	} else {
+	indexType := PopExpressionValue().Value
+	if indexType != VAL_INTEGER {
+		c.Error("Array index must be an integer value")
+	}
 
+	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
+
+	idx, _, varscope := c.ResolveVariable(tok)
+	if c.Match(TOKEN_EQUAL) {
+		c.Expression()
+		if varscope == GLOBAL {
+			c.EmitInstr(OP_SET_AGLOBAL, idx)
+		} else {
+			c.EmitInstr(OP_SET_ALOCAL, idx)
+		}
+		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
+	} else {
+		if varscope == GLOBAL {
+			c.EmitInstr(OP_GET_AGLOBAL, idx)
+		} else {
+			c.EmitInstr(OP_GET_ALOCAL, idx)
+		}
+		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
 	}
 }
 
 func (c *Compiler) ResolveVariable(tok Token) (int16, ExpressionData, VariableScope) {
 
+	var idx int16
+	var expData *ExpressionData
+	var vScope VariableScope
+	var ok bool
+
+	if idx, expData = c.ResolveLocal(c.Current, tok.ToString()); idx != -1 {
+		vScope = LOCAL
+	} else if idx, expData = c.ResolveGlobal(&tok); idx != -1 {
+		vScope = GLOBAL
+	} else if idx, expData = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
+		vScope = UPVALUE
+	} else if idx, ok = namedRegisters[tok.ToString()]; ok {
+		vScope = REGISTER
+	} else {
+		c.Error("Variable not found")
+	}
+	return idx, *expData, vScope
 }
 
 func (c *Compiler) NamedVariable(canAssign bool) {
@@ -530,7 +562,8 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 
 	// Get the index value and pop it on to the stack
 	if c.Match(TOKEN_LEFT_BRACKET) {
-		c.NamedArray()
+		c.NamedArray(tok)
+		return
 	}
 
 	// If it's a local variable, we look for that before globals
@@ -590,14 +623,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		} else {
 			isGlobal = true
 			idx, exprValue = c.ResolveGlobal(&tok)
-			if exprValue.ObjType == VAR_ARRAY && hasIndex {
-				setOp = OP_SET_AGLOBAL
-				if idx != -1 {
-					getOp = OP_GET_AGLOBAL
-				}
-				isArray = true
-				isHasOperand = true
-			} else if exprValue.ObjType == VAR_HASH && hasIndex {
+			if exprValue.ObjType == VAR_HASH && hasIndex {
 				setOp = OP_SET_HGLOBAL
 				if idx != -1 {
 					getOp = OP_GET_HGLOBAL
@@ -2193,7 +2219,7 @@ func (c *Compiler) WriteComment(comment string) {
 }
 
 func (c *Compiler) IntegerType(canAssign bool) {
-	c.EmitInstr(OP_PUSH,int16(VAL_INTEGER))
+	c.EmitInstr(OP_PUSH, int16(VAL_INTEGER))
 	c.WriteComment("Push the integer type to the stack")
 }
 
