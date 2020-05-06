@@ -411,6 +411,17 @@ func (a ObjArray) GetElement(element int64) Obj {
 }
 
 type ObjEnum struct {
+	ElementCount int16
+	Data         map[string]ObjByte
+}
+
+func (o ObjEnum) ShowValue() string    { return "<Enum>" }
+func (o ObjEnum) Type() ValueType      { return VAL_ENUM }
+func (o ObjEnum) ToBytes() []byte      { return nil }
+func (o ObjEnum) ToValue() interface{} { return nil }
+
+func (o ObjEnum) GetItem(tag string) ObjByte {
+	return o.Data[tag]
 }
 
 // Utility functions

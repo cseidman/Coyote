@@ -10,7 +10,19 @@ const (
 	VAR_HASH
 	VAR_CLASS
 	VAR_INSTANCE
+	VAR_ENUM
 )
+
+var VarTypeLabel = map[VarType]string{
+	VAR_UNKNOWN:  "Uknown",
+	VAR_SCALAR:   "Scalar",
+	VAR_ARRAY:    "Array",
+	VAR_FUNCTION: "Function",
+	VAR_HASH:     "Hash",
+	VAR_CLASS:    "Class",
+	VAR_INSTANCE: "Instance",
+	VAR_ENUM:     "Enum",
+}
 
 type ValueType byte
 
@@ -35,6 +47,7 @@ const (
 	VAL_SQLCOLUMN
 	VAL_COLUMN_DEF
 	VAL_METHOD
+	VAL_ENUM
 )
 
 var ValueTypeLabel = map[ValueType]string{
@@ -58,6 +71,7 @@ var ValueTypeLabel = map[ValueType]string{
 	VAL_SQLCOLUMN:  "SQLColumn",
 	VAL_COLUMN_DEF: "ColumnDef",
 	VAL_METHOD:     "Method",
+	VAL_ENUM:       "Enum",
 }
 
 type FunctionType byte

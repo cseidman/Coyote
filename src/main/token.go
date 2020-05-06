@@ -68,11 +68,10 @@ const (
 	TOKEN_IF
 	TOKEN_NIL
 	TOKEN_OR
-	//TOKEN_PRINT
 	TOKEN_RETURN
-	// 50
 	TOKEN_SUPER
-	TOKEN_THIS
+	// 50
+	TOKEN_ENUM
 	TOKEN_TRUE
 	TOKEN_VAR
 	TOKEN_WHILE
@@ -81,8 +80,8 @@ const (
 	TOKEN_INCLUDE
 	TOKEN_TYPE_INTEGER
 	TOKEN_TYPE_FLOAT
-	// 60
 	TOKEN_TYPE_BOOL
+	// 60
 	TOKEN_TYPE_STRING
 	TOKEN_TYPE_ARRAY
 	// SQL Specific commands
@@ -186,18 +185,17 @@ var TokenLabels = map[string]TokenProperties{
 	"function": {TOKEN_FUNC, true},
 	"select":   {TOKEN_SELECT, true},
 	//40
-	"if":  {TOKEN_IF, true},
-	"nil": {TOKEN_NIL, true},
-	"or":  {TOKEN_OR, true},
-	/*"print":  {TOKEN_PRINT, true},*/
+	"if":     {TOKEN_IF, true},
+	"nil":    {TOKEN_NIL, true},
+	"or":     {TOKEN_OR, true},
 	"return": {TOKEN_RETURN, true},
 	"super":  {TOKEN_SUPER, true},
-	"this":   {TOKEN_THIS, true},
+	"enum":   {TOKEN_ENUM, true},
 	"true":   {TOKEN_TRUE, true},
 	"var":    {TOKEN_VAR, true},
 	"while":  {TOKEN_WHILE, true},
+	"error":  {TOKEN_ERROR, true},
 	// 50
-	"error":   {TOKEN_ERROR, true},
 	"include": {TOKEN_INCLUDE, true},
 	"int":     {TOKEN_TYPE_INTEGER, true},
 	"float":   {TOKEN_TYPE_FLOAT, true},
@@ -206,8 +204,8 @@ var TokenLabels = map[string]TokenProperties{
 	"array":   {TOKEN_TYPE_ARRAY, true},
 	"insert":  {TOKEN_INSERT, false},
 	"update":  {TOKEN_UPDATE, false},
+	"delete":  {TOKEN_DELETE, false},
 	// 60
-	"delete":    {TOKEN_DELETE, false},
 	"from":      {TOKEN_FROM, true},
 	"join":      {TOKEN_JOIN, true},
 	"left":      {TOKEN_LEFT, true},
@@ -217,8 +215,8 @@ var TokenLabels = map[string]TokenProperties{
 	"all":       {TOKEN_ALL, true},
 	"order":     {TOKEN_ORDER, true},
 	"group":     {TOKEN_GROUP, true},
+	"by":        {TOKEN_BY, true},
 	// 70
-	"by":     {TOKEN_BY, true},
 	"into":   {TOKEN_INTO, true},
 	"values": {TOKEN_VALUES, true},
 	"as":     {TOKEN_AS, true},

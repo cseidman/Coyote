@@ -150,7 +150,7 @@ func (v *VM) CallNative() {
 func (v *VM) MethodCall() {
 
 	idx := string(v.GetOperand().(ObjString))
-	argCount := int(v.GetOperandValue()) - 1
+	argCount := int(v.GetOperandValue())
 	classInst := v.Peek(argCount).(*ObjClass)
 
 	fld := classInst.Fields[idx]
@@ -760,6 +760,23 @@ func (v *VM) Dispatch(opCode byte) {
 		array := v.Peek(1).(ObjArray)
 
 		v.Push(array.Elements[int64(index)])
+
+	case OP_ENUM:
+		elements := v.GetOperandValue()
+		enumObj := ObjEnum{
+			ElementCount: elements,
+			Data:         make(map[string]ObjByte, elements),
+		}
+		for i := elements - 1; i >= 0; i-- {
+			enumObj.Data[string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))] = ObjByte{byte(i)}
+		}
+		v.Push(&enumObj)
+
+	case OP_ENUM_TAG:
+		key := string(v.GetOperand().(ObjString))
+		enumObj := v.Peek(1).(*ObjEnum)
+		v.sp--
+		v.Push(enumObj.GetItem(key))
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

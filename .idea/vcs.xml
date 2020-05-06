@@ -2,12 +2,5 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/github.com/konsorten/go-windows-terminal-sequences" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/github.com/sirupsen/logrus" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/github.com/therecipe/env_windows_amd64_513" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/github.com/therecipe/qt" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/golang.org/x/mod" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/golang.org/x/tools" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/src/src/golang.org/x/xerrors" vcs="Git" />
   </component>
 </project>
