@@ -536,8 +536,8 @@ func (v *VM) Dispatch(opCode byte) {
 
 		v.Push(rval * lval)
 	case OP_IDIVIDE:
-		rval := int64(*v.Pop().(*ObjInteger))
-		lval := int64(*v.Pop().(*ObjInteger))
+		rval := int64(v.Pop().(ObjInteger))
+		lval := int64(v.Pop().(ObjInteger))
 
 		v.Push(ObjInteger(lval / rval))
 	case OP_FDIVIDE:
@@ -556,7 +556,7 @@ func (v *VM) Dispatch(opCode byte) {
 		//v.Push(val)
 
 	case OP_INEGATE:
-		val := -int64(*v.Pop().(*ObjInteger))
+		val := -int64(v.Pop().(ObjInteger))
 		v.Push(ObjInteger(-val))
 
 	case OP_FNEGATE:
@@ -567,18 +567,18 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_GET_HLOCAL:
 		elem := v.Pop()
 		slot := v.GetOperandValue()
-		v.Push(v.Frame.slots[slot].(*ObjList).GetValue(elem))
+		v.Push(v.Frame.slots[slot].(ObjList).GetValue(elem))
 
 	case OP_GET_HGLOBAL:
-		index := v.Pop()
+		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		list := v.Globals[v.GetOperandValue()].(*ObjList)
 		v.Push(list.GetValue(index))
 
 	case OP_SET_HGLOBAL:
 		val := v.Pop()
-		index := v.Pop()
+		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
-		v.Push(oList)
+		//v.Push(oList)
 		oList.SetValue(index, val)
 
 	case OP_GET_GLOBAL_0:

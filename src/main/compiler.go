@@ -484,6 +484,32 @@ func (c *Compiler) ResolveUpvalue(fn *FunctionVar, name string) (int16, *Express
 }
 
 func (c *Compiler) NamedList(tok Token) {
+	// Get the list
+	idx, _, varscope := c.ResolveVariable(tok)
+
+	// Get the key
+	c.Consume(TOKEN_IDENTIFIER, "Expect key after '$'")
+	key := c.Parser.Previous.ToString()
+
+	kIdx := c.MakeConstant(ObjString(key))
+	c.EmitInstr(OP_PUSH, kIdx)
+
+	if c.Match(TOKEN_EQUAL) {
+		c.Expression()
+		if varscope == GLOBAL {
+			c.EmitInstr(OP_SET_HGLOBAL, idx)
+		} else {
+			c.EmitInstr(OP_SET_HLOCAL, idx)
+		}
+		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
+	} else {
+		if varscope == GLOBAL {
+			c.EmitInstr(OP_GET_HGLOBAL, idx)
+		} else {
+			c.EmitInstr(OP_GET_HLOCAL, idx)
+		}
+		c.WriteComment(fmt.Sprintf("List name '%s' Index '%s'", tok.ToString(), key))
+	}
 
 }
 
@@ -558,64 +584,52 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	isGlobal := false
 	isUpvalue := false
 
-	hasIndex := false
-	isArray := false
-	isHash := false
-
 	isHasOperand := false
 
-	// Get the index value and pop it on to the stack
+	//If this is a list
+	if c.Match(TOKEN_DOLLAR) {
+		c.NamedList(tok)
+		return
+	}
+
+	// If this is an array .
 	if c.Match(TOKEN_LEFT_BRACKET) {
 		c.NamedArray(tok)
 		return
 	}
 
 	// If it's a local variable, we look for that before globals
-	idx, exprValue := c.ResolveLocal(c.Current, tok.ToString())
+	idx, _ := c.ResolveLocal(c.Current, tok.ToString())
 	// -1 means it wasn't found
 	if idx != -1 {
 		isLocal = true
 		// If this is an expression of an array element
-		if exprValue.ObjType == VAR_ARRAY && hasIndex {
-			// Get the index value and pop it on to the stack
-			getOp = OP_GET_ALOCAL
-			setOp = OP_SET_ALOCAL
-			isArray = true
+		switch idx {
+		case 0:
+			getOp = OP_GET_LOCAL_0
+		case 1:
+			getOp = OP_GET_LOCAL_1
+		case 2:
+			getOp = OP_GET_LOCAL_2
+		case 3:
+			getOp = OP_GET_LOCAL_3
+		case 4:
+			getOp = OP_GET_LOCAL_4
+		case 5:
+			getOp = OP_GET_LOCAL_5
+		default:
+			getOp = OP_GET_LOCAL
 			isHasOperand = true
-		} else if exprValue.ObjType == VAR_HASH && hasIndex {
-			getOp = OP_GET_HLOCAL
-			setOp = OP_SET_HLOCAL
-			isHash = true
-			isHasOperand = true
-		} else {
-			switch idx {
-			case 0:
-				getOp = OP_GET_LOCAL_0
-			case 1:
-				getOp = OP_GET_LOCAL_1
-			case 2:
-				getOp = OP_GET_LOCAL_2
-			case 3:
-				getOp = OP_GET_LOCAL_3
-			case 4:
-				getOp = OP_GET_LOCAL_4
-			case 5:
-				getOp = OP_GET_LOCAL_5
-			default:
-				getOp = OP_GET_LOCAL
-				isHasOperand = true
-			}
-			setOp = OP_SET_LOCAL
 		}
+		setOp = OP_SET_LOCAL
 
-	} else if idx, exprValue = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
+	} else if idx, _ = c.ResolveUpvalue(c.Current, tok.ToString()); idx != -1 {
 		isUpvalue = true
 		getOp = OP_GET_UPVALUE
 		setOp = OP_SET_UPVALUE
 		isHasOperand = true
 
 	} else {
-
 		// Is it in a register?
 		ridx, ok := namedRegisters[tok.ToString()]
 		if ok {
@@ -626,34 +640,25 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			isHasOperand = true
 		} else {
 			isGlobal = true
-			idx, exprValue = c.ResolveGlobal(&tok)
-			if exprValue.ObjType == VAR_HASH && hasIndex {
-				setOp = OP_SET_HGLOBAL
-				if idx != -1 {
-					getOp = OP_GET_HGLOBAL
-				}
-				isHash = true
-				isHasOperand = true
-			} else {
-				setOp = OP_SET_GLOBAL
-				if idx != -1 {
-					switch idx {
-					case 0:
-						getOp = OP_GET_GLOBAL_0
-					case 1:
-						getOp = OP_GET_GLOBAL_1
-					case 2:
-						getOp = OP_GET_GLOBAL_2
-					case 3:
-						getOp = OP_GET_GLOBAL_3
-					case 4:
-						getOp = OP_GET_GLOBAL_4
-					case 5:
-						getOp = OP_GET_GLOBAL_5
-					default:
-						getOp = OP_GET_GLOBAL
-						isHasOperand = true
-					}
+			idx, _ = c.ResolveGlobal(&tok)
+			setOp = OP_SET_GLOBAL
+			if idx != -1 {
+				switch idx {
+				case 0:
+					getOp = OP_GET_GLOBAL_0
+				case 1:
+					getOp = OP_GET_GLOBAL_1
+				case 2:
+					getOp = OP_GET_GLOBAL_2
+				case 3:
+					getOp = OP_GET_GLOBAL_3
+				case 4:
+					getOp = OP_GET_GLOBAL_4
+				case 5:
+					getOp = OP_GET_GLOBAL_5
+				default:
+					getOp = OP_GET_GLOBAL
+					isHasOperand = true
 				}
 			}
 		}
@@ -668,16 +673,10 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		//	c.EmitOp(setOp)
 		//}
 		data := PopExpressionValue()
-		if isArray {
-			valType = data.Value
-			objType = VAR_ARRAY
-		} else if isHash {
-			valType = VAL_LIST
-			objType = VAR_HASH
-		} else {
-			valType = data.Value
-			objType = data.ObjType
-		}
+
+		valType = data.Value
+		objType = data.ObjType
+
 		if isGlobal {
 
 			GlobalVars[idx].IsInitialized = true

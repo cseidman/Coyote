@@ -169,11 +169,13 @@ type HKey interface {
 }
 
 func (l ObjList) ShowValue() string {
-	s := ""
-	for k, v := range l.List {
-		s += fmt.Sprintf("(%v=%v)\n", k, v)
-	}
-	return s
+	/*
+		s := ""
+		for k, v := range l.List {
+			s += fmt.Sprintf("(%v=%v)\n", k, v)
+		}
+		return s*/
+	return "<list>"
 }
 func (l ObjList) Type() ValueType      { return VAL_LIST }
 func (l ObjList) ToBytes() []byte      { return nil }
