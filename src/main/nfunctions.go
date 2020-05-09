@@ -1,26 +1,21 @@
 package main
 
-import (
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
-)
-
 var FunctionRegister = make(map[string]*ObjNative)
 
-func RegisterNative(name string, ofn NativeFn) {
+func RegisterNative(name string, ofn NativeFn, returnData ExpressionData) {
 	FunctionRegister[name] = NewNative(&ofn)
+	FunctionRegister[name].ReturnType = returnData
 }
 
 func RegisterFunctions() {
-	RegisterNative("Add", AddIt)
-	RegisterNative("OpenFile", OpenFile)
-	RegisterNative("print", Out)
-	RegisterNative("println", Outln)
-	RegisterNative("printf", Outf)
-	RegisterNative("Matrix", Matrix)
-	RegisterNative("newarray", array)
+	RegisterNative("OpenFile", OpenFile, ExpressionData{VAL_INTEGER, VAR_SCALAR})
+	RegisterNative("print", Out, ExpressionData{VAL_INTEGER, VAR_UNKNOWN})
+	RegisterNative("println", Outln, ExpressionData{VAL_NIL, VAR_UNKNOWN})
+	RegisterNative("printf", Outf, ExpressionData{VAL_NIL, VAR_UNKNOWN})
+	RegisterNative("Matrix", Matrix, ExpressionData{VAL_CLASS, VAR_CLASS})
+	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY})
+	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
+	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
 }
 
 func ResolveNativeFunction(name string) *ObjNative {
@@ -34,94 +29,11 @@ func FuncToNative(fn *NativeFn) ObjNative {
 	return ObjNative{Function: NewNative(fn).Function}
 }
 
-// Function definitions ************************
-var AddIt NativeFn = func(vm *VM, args int, argpos int) Obj {
-	y := vm.Pop().(ObjInteger)
-	x := vm.Pop().(ObjInteger)
-
-	return x + y
-}
-
-// Print operations -------------------------------------------
-var Outf NativeFn = func(vm *VM, args int, argpos int) Obj {
-	// If there's only one parameter the print as is
-	//fmt.Printf(formattedValue(vm, args))
-	argVals := make([]interface{}, args-1)
-	for i := args - 1; i > 0; i-- {
-		argVals[i-1] = vm.Pop().ToValue()
+// Supporting functions
+func convert2FloatArray(array *ObjArray) *[]float64 {
+	ar := make([]float64, array.ElementCount)
+	for i := 0; i < array.ElementCount; i++ {
+		ar[i] = float64(array.Elements[i].(ObjFloat))
 	}
-	// The first argument is the template
-	format := string(vm.Pop().(ObjString))
-	fmt.Printf(format, argVals...)
-
-	return nil
-}
-
-var Out NativeFn = func(vm *VM, args int, argpos int) Obj {
-	x := vm.Pop()
-	fmt.Print(x.ShowValue())
-	vm.sp--
-	return nil
-}
-
-var Outln NativeFn = func(vm *VM, args int, argpos int) Obj {
-	x := vm.Pop()
-	fmt.Println(x.ShowValue())
-	vm.sp--
-	return nil
-}
-
-// Supporting function
-func formattedValue(vm *VM, args int) string {
-
-	if args == 1 {
-		x := vm.Pop()
-		return fmt.Sprint(x.ShowValue())
-	} else {
-		argVals := make([]interface{}, args-1)
-		for i := args - 1; i > 0; i-- {
-			argVals[i-1] = vm.Pop().ToValue()
-		}
-		// The first argument is the template
-		format := string(vm.Pop().ToBytes())
-		return fmt.Sprintf(format, argVals...)
-	}
-}
-
-// File operations ----------------------------------------------
-var OpenFile NativeFn = func(vm *VM, args int, argpos int) Obj {
-	fileName := string(vm.Pop().(ObjString))
-	file, err := os.Open(fileName)
-	if err != nil {
-		log.Panicf("Error opening file '%s'", fileName)
-	}
-
-	class := &ObjClass{
-		Fields: make(map[string]Obj),
-	}
-	// Load some properties
-	class.Fields["position"] = ObjInteger(0)
-
-	// Build the native methods here ************************
-
-	// read(<start:int>, <bytes:int>) returns []bytes
-
-	var fnFread NativeFn = func(vm *VM, args int, argpos int) Obj {
-		file, _ := ioutil.ReadFile(fileName)
-		return ObjString(string(file))
-	}
-	class.Fields["read"] = FuncToNative(&fnFread)
-
-	// readall: Returns the full contents of the file
-	var fnFreadAll NativeFn = func(vm *VM, args int, argpos int) Obj {
-		file, err := ioutil.ReadFile(file.Name())
-		if err != nil {
-			log.Panicf("Error reading file '%s'", fileName)
-		}
-		return ObjString(file)
-	}
-	class.Fields["readall"] = FuncToNative(&fnFreadAll)
-
-	return class
-
+	return &ar
 }

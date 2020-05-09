@@ -564,6 +564,11 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(-val)
 
 	case OP_SET_HLOCAL:
+		val := v.Pop()
+		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
+		oList := v.Globals[v.GetOperandValue()].(*ObjList)
+		//v.Push(oList)
+		oList.SetValue(index, val)
 	case OP_GET_HLOCAL:
 		elem := v.Pop()
 		slot := v.GetOperandValue()
@@ -643,7 +648,7 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_GET_AGLOBAL:
 		elem := int64(v.Pop().(ObjInteger))
 		idx := v.GetOperandValue()
-		v.Push(v.Globals[idx].(ObjArray).Elements[elem])
+		v.Push(v.Globals[idx].(*ObjArray).Elements[elem])
 
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()

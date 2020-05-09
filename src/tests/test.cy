@@ -1,13 +1,9 @@
-var x = newarray(5,int)
-x[0] = 100
-x[1] = 101
-x[2] = 1
-println(x[0])
-println(x[1])
-println(x[x[2]])
+var int x = 2
+println(x)
 
-var y = @{"One":100,"Two":200,"Three":300}
-println(y$Three)
+var float y = 3.0
+println(y)
 
-y$Four = 400
-println(y$Four)
+var []int z = @[1,2,4,7,8]
+println(z[3])
+

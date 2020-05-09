@@ -163,7 +163,7 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 
 // This is the global variable space
 type Global struct {
-	name          Token
+	name          string
 	datatype      ValueType
 	objtype       VarType
 	IsInitialized bool
@@ -172,18 +172,6 @@ type Global struct {
 
 var GlobalVars = make([]Global, 65000)
 var GlobalCount = int16(0)
-
-func AddGlobal(tok Token) int16 {
-
-	vType := GetTokenType(tok.Type)
-
-	GlobalVars[GlobalCount].name = tok
-	GlobalVars[GlobalCount].datatype = vType
-	GlobalVars[GlobalCount].objtype = VAR_UNKNOWN
-
-	GlobalCount++
-	return GlobalCount - 1
-}
 
 type Local struct {
 	name          string
@@ -347,7 +335,7 @@ func (c *Compiler) Advance() {
 func (c *Compiler) ResolveGlobal(tok *Token) (int16, *ExpressionData) {
 	var i int16
 	for i = 0; i < GlobalCount; i++ {
-		if tok.Type == GlobalVars[i].name.Type && tok.ToString() == GlobalVars[i].name.ToString() {
+		if tok.ToString() == GlobalVars[i].name {
 			return i, &ExpressionData{
 				Value:   GlobalVars[i].datatype,
 				ObjType: GlobalVars[i].objtype,
@@ -796,24 +784,28 @@ func (c *Compiler) GetDataType() ExpressionData {
 
 	expd := new(ExpressionData)
 
+	isArray := false
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
+		isArray = true
+	}
+
 	if c.Check(TOKEN_TYPE_INTEGER) {
 		expd.Value = VAL_INTEGER
-		expd.ObjType = VAR_SCALAR
 	} else if c.Check(TOKEN_TYPE_FLOAT) {
 		expd.Value = VAL_FLOAT
-		expd.ObjType = VAR_SCALAR
 	} else if c.Check(TOKEN_TYPE_STRING) {
 		expd.Value = VAL_STRING
-		expd.ObjType = VAR_SCALAR
 	} else if c.Check(TOKEN_FUNC) {
 		expd.Value = VAL_FUNCTION
-		expd.ObjType = VAR_FUNCTION
 	} else if c.Check(TOKEN_CLASS) {
 		expd.Value = VAL_CLASS
-		expd.ObjType = VAR_CLASS
 	} else {
-		//c.Advance()
 		expd.Value = VAL_NIL
+	}
+	if isArray {
+		expd.ObjType = VAR_ARRAY
+	} else {
 		expd.ObjType = VAR_SCALAR
 	}
 	return *expd
@@ -823,8 +815,109 @@ func (c *Compiler) _array(canAssign bool) {
 	//array()
 }
 
+func (c *Compiler) AddGlobal(varName string) int16 {
+	for i := int16(0); i < GlobalCount; i++ {
+		if GlobalVars[i].name == varName {
+			c.Error(fmt.Sprintf("%s has already been defined"))
+		}
+	}
+	GlobalVars[GlobalCount].name = varName
+	GlobalCount++
+	return GlobalCount - 1
+}
+
+func (c *Compiler) DeclareGlobalVariable(varName string, declaredType ExpressionData) {
+
+	index := c.AddGlobal(varName)
+
+	if c.Match(TOKEN_EQUAL) {
+		// This is the value we're going to assign
+		c.Expression()
+		expressionType := PopExpressionValue()
+		// The types don't match
+		if expressionType.Value != declaredType.Value ||
+			expressionType.ObjType != declaredType.ObjType {
+
+			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
+				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
+				ValueTypeLabel[expressionType.Value], VarTypeLabel[expressionType.ObjType])
+			c.Error(errStr)
+		}
+		// If the do, we continue here
+		GlobalVars[index].objtype = declaredType.ObjType
+		GlobalVars[index].datatype = declaredType.Value
+		c.EmitInstr(OP_SET_GLOBAL, index)
+	}
+
+}
+
+func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionData) {
+
+	// Check if this variable was already declared in the current scope
+	for i := c.Current.LocalCount - 1; i >= 0; i-- {
+		if c.Current.Locals[i].depth != -1 &&
+			c.Current.Locals[i].depth < c.ScopeDepth {
+			break
+		}
+
+		if c.IdentifiersEqual(varName, c.Current.Locals[i].name) &&
+			c.Current.Locals[i].scopeId == ScopeId {
+			c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", varName))
+		}
+	}
+	//opcode = OP_SET_LOCAL
+	index := c.AddLocal(varName)
+	c.Current.Locals[index].objtype = declaredType.ObjType
+	c.Current.Locals[index].dataType = declaredType.Value
+	c.Current.Locals[index].name = varName
+
+	if c.Match(TOKEN_EQUAL) {
+		// This is the value we're going to assign
+		c.Expression()
+		expressionType := PopExpressionValue()
+		// The types don't match
+		if expressionType.Value != declaredType.Value ||
+			expressionType.ObjType != declaredType.ObjType {
+
+			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
+				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
+				ValueTypeLabel[expressionType.Value], VarTypeLabel[expressionType.ObjType])
+			c.Error(errStr)
+		}
+		// If the do, we continue here
+		c.EmitInstr(OP_SET_LOCAL, index)
+	}
+}
+
 func (c *Compiler) DeclareVariable() {
 
+	expData := c.GetDataType()
+	c.Advance()
+	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
+
+	// Store the token here
+	tok := c.Parser.Previous
+
+	// Error if this variable collides with an existing native function name
+	if ResolveNativeFunction(tok.ToString()) != nil {
+		c.Error(fmt.Sprintf("'%s' is a reserved name", tok.ToString()))
+	}
+
+	//var scope VariableScope
+	if c.ScopeDepth == 0 {
+		//scope = GLOBAL
+		c.DeclareGlobalVariable(tok.ToString(), expData)
+	} else {
+		//scope = LOCAL
+		c.DeclareLocalVariable(tok.ToString(), expData)
+	}
+	c.ClearCR()
+}
+
+/*
+func (c *Compiler) _DeclareVariable() {
+
+	c.GetDataType()
 	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
 
 	// Store the token here
@@ -913,7 +1006,7 @@ func (c *Compiler) DeclareVariable() {
 	c.Match(TOKEN_CR) // Remove any CR after the declaration
 
 }
-
+*/
 func (c *Compiler) IdentifiersEqual(a string, b string) bool {
 	return a == b
 }
@@ -1386,7 +1479,7 @@ func (c *Compiler) Array(canAssign bool) {
 
 	for {
 		c.Expression()
-		valType := c.GetDataType().Value
+		valType := PopExpressionValue().Value
 		if elements == 0 {
 			dType = valType
 		}
@@ -2058,6 +2151,7 @@ func (c *Compiler) CallNative(nativeFunction *ObjNative) {
 	idx := c.MakeConstant(nativeFunction)
 	c.EmitInstr(OP_CALL_NATIVE, idx)
 	c.EmitOperand(argumentCount)
+	PushExpressionValue(nativeFunction.ReturnType)
 }
 
 func (c *Compiler) Procedure(functionType FunctionType) {

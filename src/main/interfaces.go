@@ -11,6 +11,7 @@ const (
 	VAR_CLASS
 	VAR_INSTANCE
 	VAR_ENUM
+	VAR_MATRIX
 )
 
 var VarTypeLabel = map[VarType]string{
@@ -22,6 +23,7 @@ var VarTypeLabel = map[VarType]string{
 	VAR_CLASS:    "Class",
 	VAR_INSTANCE: "Instance",
 	VAR_ENUM:     "Enum",
+	VAR_MATRIX:   "Matrix",
 }
 
 type ValueType byte
@@ -48,6 +50,7 @@ const (
 	VAL_COLUMN_DEF
 	VAL_METHOD
 	VAL_ENUM
+	VAL_MATRIX
 )
 
 var ValueTypeLabel = map[ValueType]string{
@@ -72,6 +75,7 @@ var ValueTypeLabel = map[ValueType]string{
 	VAL_COLUMN_DEF: "ColumnDef",
 	VAL_METHOD:     "Method",
 	VAL_ENUM:       "Enum",
+	VAL_MATRIX:     "Matrix",
 }
 
 type FunctionType byte
@@ -99,8 +103,9 @@ const (
 )
 
 type VariableScope byte
+
 const (
-	GLOBAL VariableScope=iota
+	GLOBAL VariableScope = iota
 	LOCAL
 	UPVALUE
 	REGISTER
