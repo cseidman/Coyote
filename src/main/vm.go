@@ -736,7 +736,7 @@ func (v *VM) Dispatch(opCode byte) {
 			val := v.Pop()
 			key := v.Pop()
 			lObj.AddNew(key, val) // Key, Value
-			fmt.Printf("Added %d\n", i)
+
 		}
 		v.Push(lObj)
 

@@ -784,6 +784,7 @@ func (c *Compiler) GetDataType() ExpressionData {
 
 	expd := new(ExpressionData)
 
+	isList := false
 	isArray := false
 	if c.Match(TOKEN_LEFT_BRACKET) {
 		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
@@ -800,11 +801,17 @@ func (c *Compiler) GetDataType() ExpressionData {
 		expd.Value = VAL_FUNCTION
 	} else if c.Check(TOKEN_CLASS) {
 		expd.Value = VAL_CLASS
+	} else if c.Check(TOKEN_LIST_TYPE) {
+		expd.Value = VAL_LIST
+		isList = true
 	} else {
 		expd.Value = VAL_NIL
 	}
+
 	if isArray {
 		expd.ObjType = VAR_ARRAY
+	} else if isList {
+		expd.ObjType = VAR_HASH
 	} else {
 		expd.ObjType = VAR_SCALAR
 	}
@@ -836,7 +843,8 @@ func (c *Compiler) DeclareGlobalVariable(varName string, declaredType Expression
 		expressionType := PopExpressionValue()
 		// The types don't match
 		if expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType {
+			expressionType.ObjType != declaredType.ObjType ||
+			declaredType.Value != VAL_NIL {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
 				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
@@ -877,7 +885,8 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 		expressionType := PopExpressionValue()
 		// The types don't match
 		if expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType {
+			expressionType.ObjType != declaredType.ObjType ||
+			declaredType.Value != VAL_NIL {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
 				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
@@ -892,7 +901,9 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 func (c *Compiler) DeclareVariable() {
 
 	expData := c.GetDataType()
-	c.Advance()
+	if expData.Value != VAL_NIL {
+		c.Advance()
+	}
 	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
 
 	// Store the token here
@@ -2062,6 +2073,9 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 	prop.Name = name
 	if c.Match(TOKEN_COLON) {
 		expData := c.GetDataType()
+		if expData.Value != VAL_NIL {
+			c.Advance()
+		}
 		prop.ObjType = expData.ObjType
 		prop.DataType = expData.Value
 

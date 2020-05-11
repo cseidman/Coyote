@@ -130,6 +130,7 @@ const (
 	TOKEN_PRIVATE
 	TOKEN_PUBLIC
 	TOKEN_PROTECTED
+	TOKEN_LIST_TYPE
 )
 
 type TokenProperties struct {
@@ -246,6 +247,7 @@ var TokenLabels = map[string]TokenProperties{
 	"private":   {TOKEN_PRIVATE, false},
 	"public":    {TOKEN_PUBLIC, false},
 	"protected": {TOKEN_PROTECTED, false},
+	"list": {TOKEN_LIST_TYPE, true},
 }
 
 type Precedence byte

@@ -16,6 +16,7 @@ func RegisterFunctions() {
 	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY})
 	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
 	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
+	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX})
 }
 
 func ResolveNativeFunction(name string) *ObjNative {

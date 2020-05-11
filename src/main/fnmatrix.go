@@ -24,30 +24,21 @@ var Matrix NativeFn = func(vm *VM, args int, argpos int) Obj {
 	cols := int(vm.Pop().(ObjInteger))
 	rows := int(vm.Pop().(ObjInteger))
 
-	ar := make([]float64, dataArray.ElementCount)
-	for i := 0; i < dataArray.ElementCount; i++ {
-		ar[i] = float64(dataArray.Elements[i].(ObjFloat))
-	}
-	mat := ObjMatrix{
+	ar := convert2FloatArray(dataArray)
+
+	return ObjMatrix{
 		Rows: rows,
 		Cols: cols,
-		Data: mat.NewDense(rows, cols, ar),
+		Data: mat.NewDense(rows, cols, *ar),
+	}
+}
+
+var Transpose NativeFn = func(vm *VM, args int, argpos int) Obj {
+	m :=  vm.Pop().(ObjMatrix)
+	return ObjMatrix {
+		Cols: m.Rows,
+		Rows: m.Cols,
+		Data : m.Data.T(),
 	}
 
-	oClass := &ObjClass{
-		Fields: make(map[string]Obj),
-	}
-
-	oClass.Fields["matrix"] = mat
-	oClass.FieldCount++
-
-	// Transpose
-	var fnTranspose NativeFn = func(vm *VM, args int, argpos int) Obj {
-		m := new(ObjMatrix)
-		return *m
-	}
-	oClass.Fields["Transpose"] = FuncToNative(&fnTranspose)
-	oClass.FieldCount++
-
-	return oClass
 }
