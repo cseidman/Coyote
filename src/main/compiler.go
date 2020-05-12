@@ -742,6 +742,8 @@ func (c *Compiler) DefineProperty() {
 	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
+	} else {
+		c.Advance()
 	}
 
 	//var index int16
@@ -759,6 +761,8 @@ func (c *Compiler) DefineParameter() {
 	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
+	} else {
+		c.Advance()
 	}
 
 	var index int16
@@ -786,11 +790,13 @@ func (c *Compiler) GetDataType() ExpressionData {
 
 	isList := false
 	isArray := false
+	isClass := false
+	isFunction := false
+
 	if c.Match(TOKEN_LEFT_BRACKET) {
 		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
 		isArray = true
 	}
-
 	if c.Check(TOKEN_TYPE_INTEGER) {
 		expd.Value = VAL_INTEGER
 	} else if c.Check(TOKEN_TYPE_FLOAT) {
@@ -799,8 +805,10 @@ func (c *Compiler) GetDataType() ExpressionData {
 		expd.Value = VAL_STRING
 	} else if c.Check(TOKEN_FUNC) {
 		expd.Value = VAL_FUNCTION
+		isFunction = true
 	} else if c.Check(TOKEN_CLASS) {
 		expd.Value = VAL_CLASS
+		isClass = true
 	} else if c.Check(TOKEN_LIST_TYPE) {
 		expd.Value = VAL_LIST
 		isList = true
@@ -812,6 +820,10 @@ func (c *Compiler) GetDataType() ExpressionData {
 		expd.ObjType = VAR_ARRAY
 	} else if isList {
 		expd.ObjType = VAR_HASH
+	} else if isClass {
+		expd.ObjType = VAR_CLASS
+	} else if isFunction {
+		expd.ObjType = VAR_FUNCTION
 	} else {
 		expd.ObjType = VAR_SCALAR
 	}
@@ -842,8 +854,8 @@ func (c *Compiler) DeclareGlobalVariable(varName string, declaredType Expression
 		c.Expression()
 		expressionType := PopExpressionValue()
 		// The types don't match
-		if expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType ||
+		if (expressionType.Value != declaredType.Value ||
+			expressionType.ObjType != declaredType.ObjType) &&
 			declaredType.Value != VAL_NIL {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
@@ -884,8 +896,8 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 		c.Expression()
 		expressionType := PopExpressionValue()
 		// The types don't match
-		if expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType ||
+		if (expressionType.Value != declaredType.Value ||
+			expressionType.ObjType != declaredType.ObjType) &&
 			declaredType.Value != VAL_NIL {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
@@ -1252,7 +1264,7 @@ func (c *Compiler) Unary(canAssign bool) {
 	c.ParsePrecedence(PREC_UNARY)
 
 	valtype := c.GetDataType().Value
-
+	c.Advance()
 	// Emit the operator instruction.
 	switch operatorType {
 	case TOKEN_BANG:
@@ -1616,7 +1628,7 @@ func (c *Compiler) Variable(canAssign bool) {
 			c.EmitInstr(OP_ENUM_TAG, idx)
 		default:
 			// Uh oh ..
-			c.Error(fmt.Sprintf("Variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
+			c.Error(fmt.Sprintf("Compound variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
 		}
 
 	}
@@ -2046,7 +2058,7 @@ func (c *Compiler) CaseStatement() {
 	c.EmitOp(OP_POP)
 }
 
-func (c *Compiler) CreateClassComponent(class *ClassVar, tType TokenType) {
+func (c *Compiler) CreateClassComponent(class *ClassVar, accessorType AccessorType) {
 	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after access indicator")
 
 	// Name of the property
@@ -2097,16 +2109,15 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 func (c *Compiler) ClassComponents(class *ClassVar) {
 	// Default Access indicator is public
-	accessType := TOKEN_PUBLIC
+	accessType := PUBLIC
 
 	// If there's an explicit indicator, we consume it here
 	if c.Match(TOKEN_PUBLIC) ||
 		c.Match(TOKEN_PRIVATE) ||
 		c.Match(TOKEN_PROTECTED) {
 
-		accessType = c.Parser.Previous.Type
+		accessType = PUBLIC
 	}
-
 	c.CreateClassComponent(class, accessType)
 }
 
@@ -2229,6 +2240,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	c.Current.returnType = c.GetDataType().Value
 	if c.Current.returnType != VAL_NIL {
 		isReturnValue = true
+		c.Advance()
 	}
 
 	// Body of the function
@@ -2241,7 +2253,6 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	}
 	c.ReturnStatement()
 	c.EndScope()
-
 	// Display
 	if c.DebugMode {
 		if functionType == TYPE_FUNCTION {
@@ -2275,7 +2286,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	}
 
 	PushExpressionValue(ExpressionData{
-		Value:   prev.returnType,
+		Value:   VAL_FUNCTION,//prev.returnType,
 		ObjType: VAR_FUNCTION,
 	})
 

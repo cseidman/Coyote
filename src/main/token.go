@@ -183,7 +183,7 @@ var TokenLabels = map[string]TokenProperties{
 	"else":     {TOKEN_ELSE, true},
 	"false":    {TOKEN_FALSE, true},
 	"for":      {TOKEN_FOR, true},
-	"function": {TOKEN_FUNC, true},
+	"func": 	{TOKEN_FUNC, true},
 	"select":   {TOKEN_SELECT, true},
 	//40
 	"if":     {TOKEN_IF, true},
