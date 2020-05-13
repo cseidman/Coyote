@@ -22,10 +22,10 @@ var dnorm NativeFn = func(vm *VM, args int, argpos int) Obj {
 	for i:=0;i<size;i++{
 		data[i] = ObjFloat(dist.Rand())
 	}
-
 	return ObjArray{
 		ElementCount: size,
 		ElementTypes: VAL_FLOAT,
 		Elements:     data,
 	}
 }
+
