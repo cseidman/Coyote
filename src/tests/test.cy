@@ -30,3 +30,8 @@ var func d = func(x:int, y:int) int {
 }
 println(d(2,6))
 println(s)
+
+var []float dist = dnorm(100,5.0,2.0)
+for i = 0 to 20 {
+    println(dist[i])
+}

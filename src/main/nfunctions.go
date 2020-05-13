@@ -17,6 +17,8 @@ func RegisterFunctions() {
 	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
 	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
 	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX})
+	// Stats - Distribution
+	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY})
 }
 
 func ResolveNativeFunction(name string) *ObjNative {

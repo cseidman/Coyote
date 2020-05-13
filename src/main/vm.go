@@ -274,8 +274,8 @@ func (v *VM) ScanArray() {
 
 	bytes := int(v.GetOperandValue())
 
-	localIndex := int64(*v.Pop().(*ObjInteger))
-	counterReg := int64(*v.Pop().(*ObjInteger))
+	localIndex := int64(v.Pop().(ObjInteger))
+	counterReg := int64(v.Pop().(ObjInteger))
 
 	// Initialize the register
 	v.Registers[counterReg] = 0
@@ -314,12 +314,12 @@ mainLoop:
 // This handles the FOR loop
 func (v *VM) ForLoop() {
 
-	fromReg := int(int64(*v.Pop().(*ObjInteger)))
+	fromReg := int(int64(v.Pop().(ObjInteger)))
 	bytes := int(v.GetOperandValue())
 
-	step := int64(*v.Pop().(*ObjInteger))
-	to := int64(*v.Pop().(*ObjInteger))
-	fromVal := int64(*v.Pop().(*ObjInteger))
+	step := int64(v.Pop().(ObjInteger))
+	to := int64(v.Pop().(ObjInteger))
+	fromVal := int64(v.Pop().(ObjInteger))
 	// We're positioned at the current instruction
 	startIp := v.Frame.ip
 	stackPtr := v.sp
@@ -567,7 +567,6 @@ func (v *VM) Dispatch(opCode byte) {
 		val := v.Pop()
 		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
-		//v.Push(oList)
 		oList.SetValue(index, val)
 	case OP_GET_HLOCAL:
 		elem := v.Pop()
@@ -583,7 +582,6 @@ func (v *VM) Dispatch(opCode byte) {
 		val := v.Pop()
 		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
-		//v.Push(oList)
 		oList.SetValue(index, val)
 
 	case OP_GET_GLOBAL_0:
@@ -604,11 +602,11 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_GLOBAL:
 		idx := v.GetOperandValue()
-		v.Globals[idx] = v.Peek(0)
+		v.Globals[idx] = v.Pop()//v.Peek(0)
 
 	case OP_SET_LOCAL:
 		slot := v.GetOperandValue()
-		v.Frame.slots[slot] = v.Peek(0)
+		v.Frame.slots[slot] = v.Pop()//v.Peek(0)
 
 	case OP_GET_LOCAL_0:
 		v.Push(v.Frame.slots[0])
@@ -628,7 +626,7 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_REGISTER:
 		idx := v.GetOperandValue()
-		v.Registers[idx] = int64(*v.Peek(0).(*ObjInteger))
+		v.Registers[idx] = int64(*v.Pop().(*ObjInteger))//int64(*v.Peek(0).(*ObjInteger))
 
 	case OP_GET_REGISTER:
 		idx := v.GetOperandValue()
@@ -644,17 +642,20 @@ func (v *VM) Dispatch(opCode byte) {
 		val := v.Peek(0)
 		elem := int64(v.Pop().(ObjInteger))
 		v.Stack[slot].(ObjArray).Elements[elem] = val
+		v.sp-- // Pop
 
 	case OP_GET_AGLOBAL:
 		elem := int64(v.Pop().(ObjInteger))
 		idx := v.GetOperandValue()
-		v.Push(v.Globals[idx].(*ObjArray).Elements[elem])
+		pval := v.Globals[idx]
+		v.Push(pval.(ObjArray).Elements[elem])
 
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()
 		val := v.Pop()
 		elem := int(v.Peek(0).(ObjInteger))
 		v.Globals[idx].(ObjArray).Elements[elem] = val
+		v.sp-- // Pop
 
 	case OP_POP:
 		v.sp--
@@ -748,7 +749,7 @@ func (v *VM) Dispatch(opCode byte) {
 		for i := elements - 1; i >= 0; i-- {
 			o[i] = v.Pop()
 		}
-		v.Push(&ObjArray{
+		v.Push(ObjArray{
 			ElementCount: int(elements),
 			ElementTypes: ValueType(dType),
 			Elements:     o,
