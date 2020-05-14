@@ -2293,42 +2293,24 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 }
 
 func (c *Compiler) Statement() {
-	if c.Match(TOKEN_VAR) {
-		c.DeclareVariable()
-	} else if c.Match(TOKEN_UPDATE) {
-		//UpdateStatement()
-	} else if c.Match(TOKEN_INSERT) {
-		//c.InsertStatement()
-	} else if c.Match(TOKEN_CREATE) {
-		//c.CreateStatement()
-	} else if c.Match(TOKEN_INCLUDE) {
-		//c.IncludeStatement()
-	} else if c.Match(TOKEN_IF) {
-		c.IfStatement()
-	} else if c.Match(TOKEN_RETURN) {
-		c.ReturnStatement()
-	} else if c.Match(TOKEN_SCAN) {
-		c.ScanStatement()
-	} else if c.Match(TOKEN_FOR) {
-		c.ForStatement()
-	} else if c.Match(TOKEN_WHILE) {
-		c.WhileStatement()
-	} else if c.Match(TOKEN_SWITCH) {
-		c.SwitchStatement()
-	} else if c.Match(TOKEN_CASE) {
-		c.CaseStatement()
-	} else if c.Match(TOKEN_LEFT_BRACE) {
-		c.BeginScope()
-		c.Block()
-		c.EndScope()
-	} else if c.Match(TOKEN_BREAK) {
-		c.BreakStatement()
-	} else if c.Match(TOKEN_CONTINUE) {
-		c.ContinueStatement()
-	} else if c.Match(TOKEN_CR) {
-		// Do nothing
-	} else {
-		c.ExpressionStatement()
+
+	switch {
+		case c.Match(TOKEN_VAR): c.DeclareVariable()
+		case c.Match(TOKEN_IF):	c.IfStatement()
+		case c.Match(TOKEN_RETURN):	c.ReturnStatement()
+		case c.Match(TOKEN_SCAN): c.ScanStatement()
+		case c.Match(TOKEN_FOR): c.ForStatement()
+		case c.Match(TOKEN_WHILE): c.WhileStatement()
+		case c.Match(TOKEN_SWITCH):	c.SwitchStatement()
+		case c.Match(TOKEN_CASE): c.CaseStatement()
+		case c.Match(TOKEN_LEFT_BRACE):
+			c.BeginScope()
+			c.Block()
+			c.EndScope()
+		case c.Match(TOKEN_BREAK): c.BreakStatement()
+		case c.Match(TOKEN_CONTINUE): c.ContinueStatement()
+		case c.Match(TOKEN_CR):
+		default: c.ExpressionStatement()
 	}
 }
 
