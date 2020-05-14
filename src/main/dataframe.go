@@ -6,7 +6,7 @@ type Column struct {
 	Ordinal int16
 	Elements int64
 	BlockSize int16
-	StoragePtr *DataStorage
+	StoragePtr []DataStorage
 }
 
 type ObjDataFrame struct {
@@ -53,6 +53,9 @@ func (o *ObjDataFrame) AddColumn(name string, valType ValueType) {
 }
 
 func (o *ObjDataFrame) AddRow(names []string, values []Obj) {
+	for k,v := range o.Columns {
+
+	}
 	for i:=0;i<len(name);i++ {
 		o.Columns[names[i]].StoragePtr = values[i].ToBytes()
 	}
