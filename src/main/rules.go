@@ -125,6 +125,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PUBLIC
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED
 		{nil, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
+		{nil, nil, nil, PREC_NONE}, // TOKEN_INDEX
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

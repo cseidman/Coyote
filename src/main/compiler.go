@@ -2289,6 +2289,32 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 }
 
+func (c *Compiler) CreateTable() {
+	c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'CREATE TABLE'")
+	tblName := c.Parser.Previous.ToString()
+
+	c.Consume(TOKEN_LEFT_PAREN,"Expect '(' after 'CREATE TABLE' statement")
+	for !c.Match(TOKEN_COMMA) {
+
+		// Column name
+		c.Consume(TOKEN_IDENTIFIER,"Expect column name")
+		colName := c.Parser.Previous.ToString()
+
+		// Column type
+		dType := c.GetDataType()
+
+
+
+	}
+}
+
+func (c *Compiler) CreateStatement() {
+	switch {
+	case c.Match(TOKEN_TABLE) : c.CreateTable()
+	case c.Match(TOKEN_INDEX) :
+	}
+}
+
 func (c *Compiler) Statement() {
 
 	switch {
@@ -2307,6 +2333,7 @@ func (c *Compiler) Statement() {
 		case c.Match(TOKEN_BREAK): c.BreakStatement()
 		case c.Match(TOKEN_CONTINUE): c.ContinueStatement()
 		case c.Match(TOKEN_CR):
+		case c.Match(TOKEN_CREATE): c.CreateStatement()
 		default: c.ExpressionStatement()
 	}
 }

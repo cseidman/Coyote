@@ -46,7 +46,7 @@ func (o *ObjDataFrame) AddColumn(name string, valType ValueType) {
 	if _,ok := o.Columns[name];ok {
 		panic("Column already exists")
 	}
-	o.Columns[o.ColumnCount] = Column{
+	o.Columns[name] = &Column{
 		Name:       name,
 		ValType:    valType,
 		Ordinal:    o.ColumnCount+1,
@@ -60,7 +60,7 @@ func (o *ObjDataFrame) AddRow(names []string, values []Obj) {
 	if o.RowCapacity == o.RowCount {
 		o.AllocateRows()
 	}
-	for i:=0;i<len(name);i++ {
+	for i:=0;i<len(names);i++ {
 		o.Columns[names[i]].StoragePtr[o.RowCount] = values[i].ToBytes()
 	}
 	o.RowCount++
@@ -69,7 +69,7 @@ func (o *ObjDataFrame) AddRow(names []string, values []Obj) {
 func (o *ObjDataFrame) AllocateRows() {
 	newData := make([]DataStorage,ROW_DB_CAPACITY)
 	for k,_ := range o.Columns {
-		o.Columns[k] = append(o.Columns[k],newData)
+		o.Columns[k].StoragePtr = append(o.Columns[k].StoragePtr,newData...)
 	}
 }
 
@@ -79,7 +79,7 @@ func (o *ObjDataFrame) QueryBuilder() {
 	// 2) Assign them each an alias if they don't have one
 	// 3) Make sure the aliases aren't repeated
 
-	// 1) Evaluate JOIN conditions 
+	// 1) Evaluate JOIN conditions
 
 	// 1) Get a list of all the columns in all the data sources
 	// 2) Match the columns in the SELECT statement with the ones in the above list
