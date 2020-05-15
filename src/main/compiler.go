@@ -20,9 +20,6 @@ const (
 // referring to when we come to a . modifier
 var CurrentClass *ClassVar
 
-// Classes
-var ClassBag = make(map[string]*ClassVar)
-
 // Keeps track of break and continue instruction locations
 type Break struct {
 	StartLoc int  // Continue will bump up to here
