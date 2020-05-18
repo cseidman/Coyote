@@ -15,7 +15,24 @@ type CallFrame struct {
 	slotptr int
 }
 
+type Database struct {
+	Name string
+	Tables map[string]ObjDataFrame
+	TableCount int
+}
+
+func (d *Database) AddTable(df ObjDataFrame) {
+	d.Tables[df.Name] = df
+	d.TableCount++
+}
+
+func (d *Database) DropTable(dfName string) {
+	delete(d.Tables, dfName)
+	d.TableCount--
+}
+
 type VM struct {
+	DataBases map[string]Database
 	Frames []CallFrame
 	Code   []byte
 	fp     int
@@ -27,6 +44,8 @@ type VM struct {
 
 	sp     int
 	prevSp int
+
+	CurrDb string // Current Database
 
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
@@ -214,9 +233,19 @@ func Exec(source *string, dbgMode bool) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
+		DataBases: make(map[string]Database),
 		DebugMode: dbgMode,
 	}
 	fn := Compile(source, dbgMode)
+
+	// Create a default database
+	vm.DataBases["main"] = Database{
+		Name:       "main",
+		Tables:     make(map[string]ObjDataFrame),
+		TableCount: 0,
+	}
+
+	vm.CurrDb = "main"
 
 	if fn == nil {
 		fmt.Println("Syntax error")
@@ -783,6 +812,47 @@ func (v *VM) Dispatch(opCode byte) {
 		enumObj := v.Peek(1).(*ObjEnum)
 		v.sp--
 		v.Push(enumObj.GetItem(key))
+
+	case OP_CREATE_TABLE:
+		df := v.GetOperand().(ObjDataFrame)
+		db := v.DataBases[v.CurrDb]
+		db.AddTable(df)
+
+	case OP_DROP_TABLE:
+		tableName := string(v.GetOperand().(ObjString))
+		db := v.DataBases[v.CurrDb]
+		db.DropTable(tableName)
+
+	case OP_INSERT:
+
+		tableName := string(v.GetOperand().(ObjString))
+		valCount := v.GetOperandValue()
+
+		// Instance of the table
+		table := v.DataBases[v.CurrDb].Tables[tableName]
+		var cols []string
+		// If no columns were declared, we're going to get the column count from the
+		// table itself
+		if valCount == 0 {
+			cols = table.ColNames
+			valCount = int16(len(cols))
+		} else {
+			cols = make([]string,valCount)
+		}
+
+		vals := make([]Obj,valCount)
+		// Now get the values
+		for i := valCount-1; i >= 0; i-- {
+			vals[i] = v.Pop()
+		}
+
+		// Get the list of columns
+
+		for i := valCount-1; i >= 0; i-- {
+			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
+		}
+
+		table.AddRow(cols,vals)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

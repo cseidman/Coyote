@@ -14,6 +14,7 @@ type Scanner struct {
 	Line        int
 	SkipCRDepth int
 	SkipCRMode  []bool
+	SQLMode		bool
 	ScanDepth   int
 }
 
@@ -27,7 +28,7 @@ func NewScanner(source *string) Scanner {
 
 		SkipCRDepth: 0,
 		SkipCRMode:  make([]bool, 256),
-
+		SQLMode: false,
 		ScanDepth: 0,
 	}
 

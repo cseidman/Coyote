@@ -1,5 +1,9 @@
 package main
 
+import (
+	"fmt"
+)
+
 const ROW_DB_CAPACITY = 1000
 
 type Column struct {
@@ -11,9 +15,18 @@ type Column struct {
 	StoragePtr []DataStorage
 }
 
+func (c *Column) GetValue(row int64) Obj {
+	switch c.ValType {
+		case VAL_STRING:
+			return ObjString(string(c.StoragePtr[row]))
+	}
+	return nil
+}
+
 type ObjDataFrame struct {
 	Name string
 	Columns map[string]*Column
+	ColNames []string
 	ColumnCount int16
 	RowCount int64
 	Defined bool
@@ -25,7 +38,20 @@ func (o ObjDataFrame) ShowValue() string {return o.Name}
 func (o ObjDataFrame) Type() ValueType {return VAL_TABLE}
 func (o ObjDataFrame) ToBytes() []byte {panic("implement me")}
 func (o ObjDataFrame) ToValue() interface{} {return o}
-func (o ObjDataFrame) Print() string {return "<table>"}
+func (o ObjDataFrame) Print() string {
+	str := ""
+	for col := range o.ColNames {
+		str += fmt.Sprintf("%s\t",col)
+	}
+	str+="\n"
+	for r:=int64(0);r<o.RowCount;r++ {
+		for col := range o.ColNames {
+			str += fmt.Sprintf("%s\t", o.Columns[o.ColNames[col]].GetValue(r).Print())
+		}
+	}
+
+	return str
+}
 
 // Data Storage
 type DataStorage []byte
@@ -38,6 +64,7 @@ func CreateTable(name string) ObjDataFrame {
 		Columns:     make(map[string]*Column),
 		ColumnCount: 0,
 		Defined:     false, // Is the table finished being deined?
+		ColNames:    make([]string,0),
 	}
 }
 
@@ -53,6 +80,7 @@ func (o *ObjDataFrame) AddColumn(name string, valType ValueType) {
 		Elements:   0,
 		StoragePtr: nil,
 	}
+	o.ColNames = append(o.ColNames,name)
 	o.ColumnCount++
 }
 
