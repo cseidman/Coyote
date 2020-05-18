@@ -499,32 +499,48 @@ func (c *Compiler) NamedList(tok Token) {
 }
 
 func (c *Compiler) NamedArray(tok Token) {
-	// Needs to return an integer
-	c.Expression()
-	indexType := PopExpressionValue().Value
-	if indexType != VAL_INTEGER {
-		c.Error("Array index must be an integer value")
+
+	idx, expData, varscope := c.ResolveVariable(tok)
+
+	if varscope == GLOBAL {
+		c.EmitInstr(OP_GET_AGLOBAL, idx)
+	} else {
+		c.EmitInstr(OP_GET_ALOCAL, idx)
+	}
+	dims := 0
+	for {
+		if c.Match(TOKEN_LEFT_BRACKET) {
+			dims++
+			c.Expression()
+			c.Consume(TOKEN_RIGHT_BRACKET,"']' must follow array index reference")
+		} else {
+			break
+		}
 	}
 
-	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array expression")
+	PushExpressionValue(expData)
+	c.WriteComment(fmt.Sprintf("Array name %s Index %d of type %s", tok.ToString(), idx,ValueTypeLabel[expData.Value]))
 
-	idx, _, varscope := c.ResolveVariable(tok)
 	if c.Match(TOKEN_EQUAL) {
 		c.Expression()
+		PopExpressionValue()
 		if varscope == GLOBAL {
 			c.EmitInstr(OP_SET_AGLOBAL, idx)
 		} else {
 			c.EmitInstr(OP_SET_ALOCAL, idx)
 		}
 		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
-	} else {
+	}/* else {
 		if varscope == GLOBAL {
 			c.EmitInstr(OP_GET_AGLOBAL, idx)
 		} else {
 			c.EmitInstr(OP_GET_ALOCAL, idx)
 		}
-		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
-	}
+		PushExpressionValue(expData)
+		c.WriteComment(fmt.Sprintf("Array name %s Index %d of type %s", tok.ToString(), idx,ValueTypeLabel[expData.Value]))
+
+	}*/
+
 }
 
 func (c *Compiler) ResolveVariable(tok Token) (int16, ExpressionData, VariableScope) {
@@ -551,7 +567,6 @@ func (c *Compiler) ResolveVariable(tok Token) (int16, ExpressionData, VariableSc
 func (c *Compiler) NamedVariable(canAssign bool) {
 
 	tok := c.Parser.Previous
-
 	// Above all, check to see if this name is a built-in function
 	nativeFunction := ResolveNativeFunction(tok.ToString())
 	if nativeFunction != nil {
@@ -578,7 +593,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	}
 
 	// If this is an array .
-	if c.Match(TOKEN_LEFT_BRACKET) {
+	if c.Check(TOKEN_LEFT_BRACKET) {
 		c.NamedArray(tok)
 		return
 	}
@@ -652,11 +667,6 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 	if canAssign && c.Match(TOKEN_EQUAL) {
 
 		c.Expression()
-		//if isHasOperand {
-		c.EmitInstr(setOp, idx)
-		//} else {
-		//	c.EmitOp(setOp)
-		//}
 		data := PopExpressionValue()
 
 		valType = data.Value
@@ -665,12 +675,20 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		if isGlobal {
 
 			GlobalVars[idx].IsInitialized = true
-			GlobalVars[idx].datatype = valType
-			GlobalVars[idx].objtype = objType
+			//GlobalVars[idx].datatype = valType
+			//GlobalVars[idx].objtype = objType
 
 			if objType == VAR_CLASS {
 
 				GlobalVars[idx].Class = CurrentClass
+			}
+
+			if GlobalVars[idx].datatype != valType || GlobalVars[idx].objtype != objType {
+				gVar := ValueTypeLabel[GlobalVars[idx].datatype]
+				gObj := VarTypeLabel[ GlobalVars[idx].objtype]
+				errStr := fmt.Sprintf("Variable %s is a %s of type %s: cannot assign a %s of type %s",
+					tok.ToString(),gObj,gVar,VarTypeLabel[objType],ValueTypeLabel[valType])
+				c.Error(errStr)
 			}
 
 		} else if isLocal {
@@ -692,7 +710,7 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 				c.Current.Upvalues[idx].Class = CurrentClass
 			}
 		}
-
+		c.EmitInstr(setOp,idx)
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[setOp], tok.ToString(), idx, valType))
 	} else {
 		if isHasOperand {
@@ -739,8 +757,6 @@ func (c *Compiler) DefineProperty() {
 	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
-	} else {
-		c.Advance()
 	}
 
 	//var index int16
@@ -758,10 +774,7 @@ func (c *Compiler) DefineParameter() {
 	valType = c.GetDataType().Value
 	if valType == VAL_NIL {
 		c.ErrorAtCurrent("Invalid data type")
-	} else {
-		c.Advance()
 	}
-
 	var index int16
 
 	for i := c.Current.LocalCount - 1; i >= 0; i-- {
@@ -781,49 +794,64 @@ func (c *Compiler) DefineParameter() {
 
 }
 
+// This function is called to make sense of variable declarations where we
+// declare the type before the variable name
 func (c *Compiler) GetDataType() ExpressionData {
+	// We use this fnu
 
 	expd := new(ExpressionData)
 
-	isList := false
-	isArray := false
-	isClass := false
-	isFunction := false
+	switch {
 
-	if c.Match(TOKEN_LEFT_BRACKET) {
-		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
-		isArray = true
-	}
-	if c.Check(TOKEN_TYPE_INTEGER) {
-		expd.Value = VAL_INTEGER
-	} else if c.Check(TOKEN_TYPE_FLOAT) {
-		expd.Value = VAL_FLOAT
-	} else if c.Check(TOKEN_TYPE_STRING) {
-		expd.Value = VAL_STRING
-	} else if c.Check(TOKEN_FUNC) {
-		expd.Value = VAL_FUNCTION
-		isFunction = true
-	} else if c.Check(TOKEN_CLASS) {
-		expd.Value = VAL_CLASS
-		isClass = true
-	} else if c.Check(TOKEN_LIST_TYPE) {
-		expd.Value = VAL_LIST
-		isList = true
-	} else {
-		expd.Value = VAL_NIL
+	case c.Check(TOKEN_TYPE_INTEGER):
+		c.Advance()
+		if c.Match(TOKEN_LEFT_BRACKET) {
+			// Close it out
+			c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after array dimension declaration")
+
+			expd.ObjType = VAR_ARRAY
+			expd.Value = VAL_INTEGER
+		} else 	{
+			expd.ObjType = VAR_SCALAR
+			expd.Value = VAL_INTEGER
+		}
+	case c.Check(TOKEN_TYPE_FLOAT):
+		{
+			c.Advance()
+			expd.ObjType = VAR_SCALAR
+			expd.Value = VAL_FLOAT
+		}
+	case c.Check(TOKEN_TYPE_STRING):
+		{
+			c.Advance()
+			expd.ObjType = VAR_SCALAR
+			expd.Value = VAL_STRING
+		}
+	case c.Check(TOKEN_FUNC):
+		{
+			c.Advance()
+			expd.ObjType = VAR_FUNCTION
+			expd.Value = VAL_FUNCTION
+		}
+	case c.Check(TOKEN_CLASS):
+		{
+			c.Advance()
+			expd.ObjType = VAR_CLASS
+			expd.Value = VAL_CLASS
+		}
+	case c.Check(TOKEN_LIST_TYPE):
+		{
+			c.Advance()
+			expd.ObjType = VAR_HASH
+			expd.Value = VAL_LIST
+		}
+	default:
+		{
+			expd.ObjType = VAR_UNKNOWN
+			expd.Value = VAL_NIL
+		}
 	}
 
-	if isArray {
-		expd.ObjType = VAR_ARRAY
-	} else if isList {
-		expd.ObjType = VAR_HASH
-	} else if isClass {
-		expd.ObjType = VAR_CLASS
-	} else if isFunction {
-		expd.ObjType = VAR_FUNCTION
-	} else {
-		expd.ObjType = VAR_SCALAR
-	}
 	return *expd
 }
 
@@ -845,6 +873,8 @@ func (c *Compiler) AddGlobal(varName string) int16 {
 func (c *Compiler) DeclareGlobalVariable(varName string, declaredType ExpressionData) {
 
 	index := c.AddGlobal(varName)
+	GlobalVars[index].objtype = declaredType.ObjType
+	GlobalVars[index].datatype = declaredType.Value
 
 	if c.Match(TOKEN_EQUAL) {
 		// This is the value we're going to assign
@@ -861,8 +891,7 @@ func (c *Compiler) DeclareGlobalVariable(varName string, declaredType Expression
 			c.Error(errStr)
 		}
 		// If the do, we continue here
-		GlobalVars[index].objtype = declaredType.ObjType
-		GlobalVars[index].datatype = declaredType.Value
+
 		c.EmitInstr(OP_SET_GLOBAL, index)
 	}
 
@@ -910,9 +939,6 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 func (c *Compiler) DeclareVariable() {
 
 	expData := c.GetDataType()
-	if expData.Value != VAL_NIL {
-		c.Advance()
-	}
 	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
 
 	// Store the token here
@@ -934,99 +960,6 @@ func (c *Compiler) DeclareVariable() {
 	c.ClearCR()
 }
 
-/*
-func (c *Compiler) _DeclareVariable() {
-
-	c.GetDataType()
-	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
-
-	// Store the token here
-	tok := c.Parser.Previous
-
-	// Error if this variable collides with an existing native function name
-	if ResolveNativeFunction(tok.ToString()) != nil {
-		c.Error(fmt.Sprintf("'%s' is a reserved name", tok.ToString()))
-	}
-
-	var index int16
-	var opcode byte
-	var valType ValueType
-
-	// At scopedepth 0 - it's a global
-	if c.ScopeDepth == 0 {
-		// So we add it to the global store
-		index = AddGlobal(tok)
-		opcode = OP_SET_GLOBAL
-	} else {
-
-		// Otherwise, it's a local variable
-		for i := c.Current.LocalCount - 1; i >= 0; i-- {
-			if c.Current.Locals[i].depth != -1 &&
-				c.Current.Locals[i].depth < c.ScopeDepth {
-				break
-			}
-
-			if c.IdentifiersEqual(tok.ToString(), c.Current.Locals[i].name) &&
-				c.Current.Locals[i].scopeId == ScopeId {
-				c.Error(fmt.Sprintf("Variable with the name %s already declared in this scope.", tok.ToString()))
-			}
-		}
-		opcode = OP_SET_LOCAL
-		index = c.AddLocal(tok.ToString())
-	}
-	// If there is an assigment operator after this, then we pop the rvalue
-	// on the stack as well
-	var data ExpressionData
-	if c.Match(TOKEN_EQUAL) {
-
-		c.Expression()
-		data = PopExpressionValue()
-		valType = data.Value
-
-	} else {
-
-		c.EmitOp(OP_NIL)
-		c.WriteComment("No equality token after variable declaration")
-		valType = VAL_NIL
-
-	}
-	c.EmitInstr(opcode, index)
-	PushExpressionValue(data)
-	c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[opcode], tok.ToString(), index, valType))
-
-	switch opcode {
-	case OP_SET_GLOBAL:
-
-		if GlobalVars[index].IsInitialized && valType != GlobalVars[index].datatype {
-			c.Error("Cannot assign incompatible variable")
-		}
-
-		GlobalVars[index].IsInitialized = true
-		GlobalVars[index].datatype = valType
-		GlobalVars[index].objtype = data.ObjType
-
-		if data.ObjType == VAR_CLASS {
-			GlobalVars[index].Class = CurrentClass
-		}
-
-	case OP_SET_LOCAL:
-
-		if c.Current.Locals[index].IsInitialized && valType != c.Current.Locals[index].dataType {
-			c.Error("Cannot assign incompatible variable")
-		}
-		c.Current.Locals[index].IsInitialized = true
-		c.Current.Locals[index].dataType = valType
-		c.Current.Locals[index].objtype = data.ObjType
-		if data.ObjType == VAR_CLASS {
-			c.Current.Locals[index].Class = CurrentClass
-		}
-
-	}
-
-	c.Match(TOKEN_CR) // Remove any CR after the declaration
-
-}
-*/
 func (c *Compiler) IdentifiersEqual(a string, b string) bool {
 	return a == b
 }
@@ -1084,7 +1017,7 @@ func (c *Compiler) ErrorAt(token *Token, message string) {
 	// but we keep evaluating code without actually generating byte code
 	c.Parser.PanicMode = true
 
-	fmt.Printf("[line %d] Error", token.Line)
+	fmt.Printf("[line %d] Error", token.Line+1)
 	switch token.Type {
 	case TOKEN_EOF:
 		fmt.Printf(" at end")
@@ -1243,6 +1176,41 @@ func (c *Compiler) GetArguments() int16 {
 	return argCount
 }
 
+func (c *Compiler) New(canAssign bool) {
+
+	var valType ValueType
+
+	switch {
+	case c.Match(TOKEN_TYPE_INTEGER):
+		valType = VAL_INTEGER
+	case c.Match(TOKEN_TYPE_FLOAT):
+		valType = VAL_FLOAT
+	}
+
+	// Loop in order to handle multi-dimensional arrays
+	dims := int16(0)
+	for {
+		c.Consume(TOKEN_LEFT_BRACKET, "Expect '[' after new array declaration")
+		c.Expression()
+		c.EmitOp(OP_MAKE_ARRAY)
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after new array declaration")
+
+		dims++
+		if !c.Check(TOKEN_LEFT_BRACKET) {
+			// Nor more dimensions
+			break
+		}
+	}
+
+	c.EmitInstr(OP_PUSH,dims)
+	c.EmitOp(OP_ARRAY)
+	PushExpressionValue(ExpressionData{
+		Value: valType,
+		ObjType: VAR_ARRAY,
+	})
+
+}
+
 func (c *Compiler) Postary(canAssign bool) {
 	operatorType := c.Parser.Previous.Type
 	// Emit the operator instruction.
@@ -1261,7 +1229,6 @@ func (c *Compiler) Unary(canAssign bool) {
 	c.ParsePrecedence(PREC_UNARY)
 
 	valtype := c.GetDataType().Value
-	c.Advance()
 	// Emit the operator instruction.
 	switch operatorType {
 	case TOKEN_BANG:
@@ -1368,6 +1335,13 @@ func (c *Compiler) Binary(canAssign bool) {
 	case TOKEN_HAT:
 		if data.Value == VAL_INTEGER {
 			c.EmitOp(OP_IEXP)
+			PushExpressionValue(data)
+		} else {
+			c.Error("Exponents can only be defined on integers")
+		}
+	case TOKEN_TO:
+		if data.Value == VAL_INTEGER {
+			c.EmitOp(OP_IRANGE)
 			PushExpressionValue(data)
 		} else {
 			c.Error("Exponents can only be defined on integers")
@@ -1522,7 +1496,12 @@ func (c *Compiler) Array(canAssign bool) {
 	})
 
 }
-func (c *Compiler) Index(canAssign bool) {}
+func (c *Compiler) Index(canAssign bool) {
+
+	c.Expression()
+	c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after index reference")
+	c.EmitOp(OP_AINDEX)
+}
 
 func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 
@@ -1707,8 +1686,8 @@ func (c *Compiler) ExpressionStatement() {
 	// After the expression gets evaluated, we display it on the output device
 	// That's what makes this a "statement" rather than an expression only
 	c.Consume(TOKEN_CR, "Expect 'CR' after expression.")
-	c.EmitOp(OP_POP)
-	c.WriteComment("Pop After expression statement")
+	//c.EmitOp(OP_POP)
+	//c.WriteComment("Pop After expression statement")
 }
 
 func (c *Compiler) Block() {
@@ -2237,7 +2216,6 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	c.Current.returnType = c.GetDataType().Value
 	if c.Current.returnType != VAL_NIL {
 		isReturnValue = true
-		c.Advance()
 	}
 
 	// Body of the function
@@ -2305,7 +2283,6 @@ func (c *Compiler) CreateTable() {
 
 		// Column type
 		dType := c.GetDataType()
-		c.Advance()
 
 		tbl.AddColumn(colName, dType.Value)
 
@@ -2380,7 +2357,7 @@ func (c *Compiler) InsertInto() {
 func (c *Compiler) SelectStatement() {
 
 	type SqlSelect struct {
-		table
+		//table
 	}
 
 	if c.Match(TOKEN_STAR) || c.Match(TOKEN_ALL) {
@@ -2391,24 +2368,24 @@ func (c *Compiler) SelectStatement() {
 func (c *Compiler) Statement() {
 
 	switch {
-		case c.Match(TOKEN_VAR): c.DeclareVariable()
-		case c.Match(TOKEN_IF):	c.IfStatement()
-		case c.Match(TOKEN_RETURN):	c.ReturnStatement()
-		case c.Match(TOKEN_SCAN): c.ScanStatement()
-		case c.Match(TOKEN_FOR): c.ForStatement()
-		case c.Match(TOKEN_WHILE): c.WhileStatement()
-		case c.Match(TOKEN_SWITCH):	c.SwitchStatement()
-		case c.Match(TOKEN_CASE): c.CaseStatement()
+		case c.Match(TOKEN_VAR): 		c.DeclareVariable()
+		case c.Match(TOKEN_IF):			c.IfStatement()
+		case c.Match(TOKEN_RETURN):		c.ReturnStatement()
+		case c.Match(TOKEN_SCAN): 		c.ScanStatement()
+		case c.Match(TOKEN_FOR): 		c.ForStatement()
+		case c.Match(TOKEN_WHILE): 		c.WhileStatement()
+		case c.Match(TOKEN_SWITCH):		c.SwitchStatement()
+		case c.Match(TOKEN_CASE): 		c.CaseStatement()
 		case c.Match(TOKEN_LEFT_BRACE):
 			c.BeginScope()
 			c.Block()
 			c.EndScope()
-		case c.Match(TOKEN_BREAK): c.BreakStatement()
-		case c.Match(TOKEN_CONTINUE): c.ContinueStatement()
+		case c.Match(TOKEN_BREAK): 		c.BreakStatement()
+		case c.Match(TOKEN_CONTINUE): 	c.ContinueStatement()
 		case c.Match(TOKEN_CR):
-		case c.Match(TOKEN_CREATE): c.CreateStatement()
-		case c.Match(TOKEN_INSERT): c.InsertStatement()
-		case c.Match(TOKEN_SELECT): c.SelectStatement()
+		case c.Match(TOKEN_CREATE): 	c.CreateStatement()
+		case c.Match(TOKEN_INSERT): 	c.InsertStatement()
+		case c.Match(TOKEN_SELECT): 	c.SelectStatement()
 		default: c.ExpressionStatement()
 	}
 }

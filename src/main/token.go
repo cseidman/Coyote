@@ -132,6 +132,7 @@ const (
 	TOKEN_PROTECTED
 	TOKEN_LIST_TYPE
 	TOKEN_INDEX
+	TOKEN_NEW
 )
 
 type TokenProperties struct {
@@ -250,6 +251,7 @@ var TokenLabels = map[string]TokenProperties{
 	"protected": {TOKEN_PROTECTED, false},
 	"list": {TOKEN_LIST_TYPE, true},
 	"index": {TOKEN_INDEX, false},
+	"new": {TOKEN_NEW, true},
 }
 
 type Precedence byte

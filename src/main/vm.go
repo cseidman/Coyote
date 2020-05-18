@@ -159,11 +159,14 @@ func (v *VM) CloseUpvalues(last *Obj, objIndex int) {
 }
 
 func (v *VM) CallNative() {
-	native := *v.GetOperand().(*ObjNative).Function
+	native := v.GetOperand().(*ObjNative)
 	argCount := int(v.GetOperandValue())
-	result := native(v, argCount, v.sp-argCount)
+	fn := *native.Function
+	result := fn(v, argCount, v.sp-argCount)
 	v.sp += argCount
-	v.Push(result)
+	if native.hasReturn {
+		v.Push(result)
+	}
 }
 
 func (v *VM) MethodCall() {
@@ -677,13 +680,13 @@ func (v *VM) Dispatch(opCode byte) {
 		elem := int64(v.Pop().(ObjInteger))
 		idx := v.GetOperandValue()
 		pval := v.Globals[idx]
-		v.Push(pval.(ObjArray).Elements[elem])
+		v.Push(pval.(*ObjArray).Elements[elem])
 
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()
 		val := v.Pop()
 		elem := int(v.Peek(0).(ObjInteger))
-		v.Globals[idx].(ObjArray).Elements[elem] = val
+		v.Globals[idx].(*ObjArray).Elements[elem] = val
 		v.sp-- // Pop
 
 	case OP_POP:
@@ -778,7 +781,7 @@ func (v *VM) Dispatch(opCode byte) {
 		for i := elements - 1; i >= 0; i-- {
 			o[i] = v.Pop()
 		}
-		v.Push(ObjArray{
+		v.Push(&ObjArray{
 			ElementCount: int(elements),
 			ElementTypes: ValueType(dType),
 			Elements:     o,
@@ -791,10 +794,18 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(ObjInteger(int64(array.ElementCount)))
 
 	case OP_AINDEX:
-		index := v.Peek(0).(ObjInteger)
-		array := v.Peek(1).(ObjArray)
+		index := v.Pop().(ObjInteger)
+		array := v.Pop().(ObjArray)
 
 		v.Push(array.Elements[int64(index)])
+
+	case OP_MAKE_ARRAY:
+		elemCount := int(v.Pop().(ObjInteger))
+		v.Push(&ObjArray{
+			ElementCount: elemCount,
+			ElementTypes: VAL_INTEGER,
+			Elements:     make([]Obj,elemCount),
+		})
 
 	case OP_ENUM:
 		elements := v.GetOperandValue()
@@ -812,6 +823,12 @@ func (v *VM) Dispatch(opCode byte) {
 		enumObj := v.Peek(1).(*ObjEnum)
 		v.sp--
 		v.Push(enumObj.GetItem(key))
+
+	case OP_IRANGE:
+		endRange := int64(v.Pop().(ObjInteger))
+		startRange := int64(v.Pop().(ObjInteger))
+
+		v.Push(Range(startRange,endRange))
 
 	case OP_CREATE_TABLE:
 		df := v.GetOperand().(ObjDataFrame)

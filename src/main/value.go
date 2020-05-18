@@ -99,6 +99,7 @@ type NativeFn func(vm *VM, argCounts int, stackPos int) Obj
 
 type ObjNative struct {
 	Function   *NativeFn
+	hasReturn  bool // Is there an explicit return?
 	ReturnType ExpressionData
 }
 
@@ -464,6 +465,45 @@ func (o ObjEnum) Print() string        { return "<Enum>" }
 
 func (o ObjEnum) GetItem(tag string) ObjByte {
 	return o.Data[tag]
+}
+
+type ObjRange struct {
+	Start int64
+	End int64
+	Current int64
+}
+
+func Range(start int64, end int64) *ObjRange {
+	return &ObjRange{
+		Start: start,
+		End: end,
+		Current: start,
+	}
+}
+
+func (o ObjRange) GetNext() int64 {
+	o.Current++
+	return o.Current-1
+}
+
+func (o ObjRange) ShowValue() string {
+	return fmt.Sprintf("<%d..%d>",o.Start,o.End)
+}
+
+func (o ObjRange) Type() ValueType {
+	return VAL_RANGE
+}
+
+func (o ObjRange) ToBytes() []byte {
+	panic("implement me")
+}
+
+func (o ObjRange) ToValue() interface{} {
+	return o
+}
+
+func (o ObjRange) Print() string {
+	return fmt.Sprintf("<%d..%d>",o.Start,o.End)
 }
 
 // Utility functions

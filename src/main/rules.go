@@ -14,7 +14,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_PAREN
 		{nil, nil, nil, PREC_NONE},           // TOKEN_LEFT_BRACE
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACE
-		{nil, nil, nil, PREC_INDEX},          // TOKEN_LEFT_BRACKET
+		{c.Index, nil, nil, PREC_NONE},       // TOKEN_LEFT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_COMMA
 		{nil, nil, nil, PREC_CALL},           // TOKEN_DOT
@@ -126,6 +126,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED
 		{nil, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_INDEX
+		{c.New, nil, nil, PREC_NONE}, // TOKEN_NEW
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

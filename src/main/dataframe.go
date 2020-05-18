@@ -4,7 +4,26 @@ import (
 	"fmt"
 )
 
-const ROW_DB_CAPACITY = 1000
+const ROW_DB_GROWTH = 1000 // Increment new rows bu this number
+
+// Data Object Description
+type DBObjectEntry struct {
+
+}
+// Data Columsn description
+type DBCol struct {
+
+}
+
+// Data dictionary
+type DataDict struct {
+	DBId int64 // Database id
+	DBName string // Database name
+
+
+	DBObjCount int
+
+}
 
 type Column struct {
 	Name string
@@ -95,7 +114,7 @@ func (o *ObjDataFrame) AddRow(names []string, values []Obj) {
 }
 
 func (o *ObjDataFrame) AllocateRows() {
-	newData := make([]DataStorage,ROW_DB_CAPACITY)
+	newData := make([]DataStorage,ROW_DB_GROWTH)
 	for k,_ := range o.Columns {
 		o.Columns[k].StoragePtr = append(o.Columns[k].StoragePtr,newData...)
 	}

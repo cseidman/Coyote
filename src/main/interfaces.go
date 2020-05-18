@@ -13,6 +13,7 @@ const (
 	VAR_ENUM
 	VAR_MATRIX
 	VAR_TABLE
+	VAR_RANGE
 )
 
 var VarTypeLabel = map[VarType]string{
@@ -26,6 +27,7 @@ var VarTypeLabel = map[VarType]string{
 	VAR_ENUM:     "Enum",
 	VAR_MATRIX:   "Matrix",
 	VAR_TABLE: 	  "Table",
+	VAR_RANGE:	  "Range",
 }
 
 type ValueType byte
@@ -54,6 +56,7 @@ const (
 	VAL_ENUM
 	VAL_MATRIX
 	VAL_TABLE
+	VAL_RANGE
 )
 
 var ValueTypeLabel = map[ValueType]string{
@@ -80,6 +83,7 @@ var ValueTypeLabel = map[ValueType]string{
 	VAL_ENUM:       "Enum",
 	VAL_MATRIX:     "Matrix",
 	VAL_TABLE:      "Table" ,
+	VAL_RANGE:      "Range" ,
 }
 
 type FunctionType byte

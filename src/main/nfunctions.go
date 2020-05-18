@@ -2,23 +2,24 @@ package main
 
 var FunctionRegister = make(map[string]*ObjNative)
 
-func RegisterNative(name string, ofn NativeFn, returnData ExpressionData) {
+func RegisterNative(name string, ofn NativeFn, returnData ExpressionData, hasReturnValue bool) {
 	FunctionRegister[name] = NewNative(&ofn)
 	FunctionRegister[name].ReturnType = returnData
+	FunctionRegister[name].hasReturn = hasReturnValue
 }
 
 func RegisterFunctions() {
-	RegisterNative("OpenFile", OpenFile, ExpressionData{VAL_INTEGER, VAR_SCALAR})
-	RegisterNative("print", Out, ExpressionData{VAL_INTEGER, VAR_UNKNOWN})
-	RegisterNative("println", Outln, ExpressionData{VAL_NIL, VAR_UNKNOWN})
-	RegisterNative("printf", Outf, ExpressionData{VAL_NIL, VAR_UNKNOWN})
-	RegisterNative("Matrix", Matrix, ExpressionData{VAL_CLASS, VAR_CLASS})
-	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY})
-	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
-	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR})
-	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX})
+	RegisterNative("OpenFile", OpenFile, ExpressionData{VAL_INTEGER, VAR_SCALAR}, true)
+	RegisterNative("print", Out, ExpressionData{VAL_INTEGER, VAR_UNKNOWN},false)
+	RegisterNative("println", Outln, ExpressionData{VAL_NIL, VAR_UNKNOWN},false)
+	RegisterNative("printf", Outf, ExpressionData{VAL_NIL, VAR_UNKNOWN}, false)
+	RegisterNative("Matrix", Matrix, ExpressionData{VAL_CLASS, VAR_CLASS}, true)
+	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY}, true)
+	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR}, true)
+	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR}, true)
+	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX}, true)
 	// Stats - Distribution
-	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY})
+	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY}, true)
 }
 
 func ResolveNativeFunction(name string) *ObjNative {
