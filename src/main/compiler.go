@@ -2395,8 +2395,7 @@ func (c *Compiler) WriteComment(comment string) {
 	c.CurrentInstructions().WriteComment(comment)
 }
 
-func (c *Compiler) IntegerType(canAssign bool) {
-
+func (c *Compiler) PushType(valType ValueType) {
 	if c.Match(TOKEN_LEFT_BRACKET) {
 		dims := int16(0)
 		for {
@@ -2407,15 +2406,30 @@ func (c *Compiler) IntegerType(canAssign bool) {
 			}
 		}
 		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array type initializer")
-		c.EmitInstr(OP_PUSH,int16(VAL_INTEGER))
+		c.EmitInstr(OP_PUSH,int16(valType))
 		c.EmitInstr(OP_MAKE_ARRAY,dims)
 		PushExpressionValue(ExpressionData{
-			Value:      VAL_INTEGER,
+			Value:      valType,
 			ObjType:    VAR_ARRAY,
 			Dimensions: int(dims),
 		})
 	}
+}
 
+func (c *Compiler) IntegerType(canAssign bool) {
+	c.PushType(VAL_INTEGER)
+}
+
+func (c *Compiler) FloatType(canAssign bool) {
+	c.PushType(VAL_FLOAT)
+}
+
+func (c *Compiler) BoolType(canAssign bool) {
+	c.PushType(VAL_BOOL)
+}
+
+func (c *Compiler) StringType(canAssign bool) {
+	c.PushType(VAL_STRING)
 }
 
 func GetTokenType(tokType TokenType) ValueType {
