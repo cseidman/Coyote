@@ -54,7 +54,9 @@ type NULL struct{}
 type ObjArray struct {
 	ElementCount int
 	ElementTypes ValueType
-	Elements     []Obj
+	DimCount int
+	Dimensions []int
+	Elements    []Obj
 }
 
 type ObjPointer struct {
@@ -426,8 +428,28 @@ func (a ObjArray) Print() string {
 func (a ObjArray) Init(v ValueType, e int) {
 	a.ElementCount = e
 	a.ElementTypes = v
+	a.DimCount = 1
+	a.Dimensions = []int{e}
+	a.Elements = make([]Obj, e)
+
+}
+
+func MultiplyDim(ar []int) int {
+	a := ar[0]
+	for i:=1;i<len(ar);i++ {
+		a += a*ar[i]
+	}
+	return a
+}
+
+func (a *ObjArray) InitMulti(v ValueType, e int, dims []int) {
+	a.ElementCount = e
+	a.ElementTypes = v
+	a.DimCount = len(dims)
+	a.Dimensions = dims
 	a.Elements = make([]Obj, e)
 }
+
 func (a ObjArray) ToValue() interface{} { return a.Elements }
 
 // Iterator interface
@@ -448,8 +470,34 @@ func (a ObjArray) Position() int {
 	return a.ElementCount - 1
 }
 
-func (a ObjArray) GetElement(element int64) Obj {
-	return a.Elements[element]
+func (a ObjArray) GetElement(indexes ...int64) Obj {
+	if len(indexes) == 1 {
+		return a.Elements[indexes[0]]
+	} else {
+		pos := int64(0)
+
+		// Starting at the second dimenstion
+		for i:=1;i<a.DimCount;i++ {
+			pos += int64(a.Dimensions[i])*int64(indexes[i-1])
+		}
+		pos += indexes[a.DimCount-1]
+		return a.Elements[pos]
+	}
+}
+
+func (a ObjArray) SetElement(val Obj, indexes ...int64) {
+	if len(indexes) == 1 {
+		a.Elements[indexes[0]] = val
+	} else {
+		pos := int64(0)
+
+		// Starting at the second dimenstion
+		for i:=1;i<a.DimCount;i++ {
+			pos += int64(a.Dimensions[i])*int64(indexes[i-1])
+		}
+		pos += indexes[a.DimCount-1]
+		a.Elements[pos] = val
+	}
 }
 
 type ObjEnum struct {

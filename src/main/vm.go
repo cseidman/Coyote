@@ -671,9 +671,14 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_ALOCAL:
 		slot := v.GetOperandValue()
-		val := v.Peek(0)
-		elem := int64(v.Pop().(ObjInteger))
-		v.Stack[slot].(ObjArray).Elements[elem] = val
+		val := v.Pop()
+		arr := v.Stack[slot].(ObjArray)
+		dimCount := arr.DimCount
+		elems := make([]int64,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elems[i] = int64(v.Pop().(ObjInteger))
+		}
+		v.Stack[slot].(ObjArray).SetElement(val, elems...)
 		v.sp-- // Pop
 
 	case OP_GET_AGLOBAL:
@@ -685,8 +690,13 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()
 		val := v.Pop()
-		elem := int(v.Peek(0).(ObjInteger))
-		v.Globals[idx].(*ObjArray).Elements[elem] = val
+		arr := v.Globals[idx].(*ObjArray)
+		dimCount := arr.DimCount
+		elems := make([]int64,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elems[i] = int64(v.Pop().(ObjInteger))
+		}
+		v.Globals[idx].(*ObjArray).SetElement(val, elems...)
 		v.sp-- // Pop
 
 	case OP_POP:
@@ -794,18 +804,36 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(ObjInteger(int64(array.ElementCount)))
 
 	case OP_AINDEX:
-		index := v.Pop().(ObjInteger)
-		array := v.Pop().(ObjArray)
+		dims := v.GetOperandValue()
+		indexes := make([]int64,dims)
+		for i:=dims-1;i>=0;i-- {
+			indexes[i] = int64(v.Pop().(ObjInteger))
+		}
 
-		v.Push(array.Elements[int64(index)])
+		array := v.Pop().(*ObjArray)
+
+		v.Push(array.GetElement(indexes...))
 
 	case OP_MAKE_ARRAY:
-		elemCount := int(v.Pop().(ObjInteger))
-		v.Push(&ObjArray{
+		valType := ValueType(v.Pop().(ObjInteger))
+		dimCount := v.GetOperandValue()
+		elemCount := 1
+
+		elemDim := make([]int,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elemDim[i] = int(v.Pop().(ObjInteger))
+			elemCount=elemCount*elemDim[i]
+		}
+
+		objArr := ObjArray{
 			ElementCount: elemCount,
-			ElementTypes: VAL_INTEGER,
+			ElementTypes: valType,
 			Elements:     make([]Obj,elemCount),
-		})
+		}
+
+		objArr.InitMulti(valType,elemCount,elemDim)
+
+		v.Push(&objArr)
 
 	case OP_ENUM:
 		elements := v.GetOperandValue()

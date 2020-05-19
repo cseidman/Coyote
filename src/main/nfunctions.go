@@ -9,17 +9,17 @@ func RegisterNative(name string, ofn NativeFn, returnData ExpressionData, hasRet
 }
 
 func RegisterFunctions() {
-	RegisterNative("OpenFile", OpenFile, ExpressionData{VAL_INTEGER, VAR_SCALAR}, true)
-	RegisterNative("print", Out, ExpressionData{VAL_INTEGER, VAR_UNKNOWN},false)
-	RegisterNative("println", Outln, ExpressionData{VAL_NIL, VAR_UNKNOWN},false)
-	RegisterNative("printf", Outf, ExpressionData{VAL_NIL, VAR_UNKNOWN}, false)
-	RegisterNative("Matrix", Matrix, ExpressionData{VAL_CLASS, VAR_CLASS}, true)
-	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY}, true)
-	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR}, true)
-	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR}, true)
-	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX}, true)
+	RegisterNative("OpenFile", OpenFile, ExpressionData{VAL_INTEGER, VAR_SCALAR,0}, true)
+	RegisterNative("print", Out, ExpressionData{VAL_INTEGER, VAR_UNKNOWN,0},false)
+	RegisterNative("println", Outln, ExpressionData{VAL_NIL, VAR_UNKNOWN,0},false)
+	RegisterNative("printf", Outf, ExpressionData{VAL_NIL, VAR_UNKNOWN,0}, false)
+	RegisterNative("Matrix", Matrix, ExpressionData{VAL_CLASS, VAR_CLASS,0}, true)
+	RegisterNative("newarray", array, ExpressionData{VAL_ARRAY, VAR_ARRAY,0}, true)
+	RegisterNative("mean", mean, ExpressionData{VAL_FLOAT, VAR_SCALAR,0}, true)
+	RegisterNative("wmean", wmean, ExpressionData{VAL_FLOAT, VAR_SCALAR,0}, true)
+	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX,0}, true)
 	// Stats - Distribution
-	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY}, true)
+	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY,0}, true)
 }
 
 func ResolveNativeFunction(name string) *ObjNative {

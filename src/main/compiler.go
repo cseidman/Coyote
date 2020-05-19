@@ -41,6 +41,7 @@ var ScopeId = -1
 type ExpressionData struct {
 	Value   ValueType
 	ObjType VarType
+	Dimensions int // Relevant only for arrays and matrices
 }
 
 var ExpressionValue = make([]ExpressionData, 255)
@@ -161,10 +162,11 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 // This is the global variable space
 type Global struct {
 	name          string
-	datatype      ValueType
-	objtype       VarType
+	//datatype      ValueType
+	//objtype       VarType
 	IsInitialized bool
 	Class         *ClassVar
+	ExprData      ExpressionData
 }
 
 var GlobalVars = make([]Global, 65000)
@@ -174,17 +176,17 @@ type Local struct {
 	name          string
 	depth         int
 	isCaptured    bool
-	dataType      ValueType
 	scopeId       int
-	objtype       VarType
 	IsInitialized bool
 	Class         *ClassVar
+	ExprData  ExpressionData
+
 }
 
 type Upvalue struct {
 	Index    int16
 	IsLocal  bool
-	dataType ValueType
+	ExprData  ExpressionData
 	Class    *ClassVar
 }
 
@@ -333,10 +335,7 @@ func (c *Compiler) ResolveGlobal(tok *Token) (int16, *ExpressionData) {
 	var i int16
 	for i = 0; i < GlobalCount; i++ {
 		if tok.ToString() == GlobalVars[i].name {
-			return i, &ExpressionData{
-				Value:   GlobalVars[i].datatype,
-				ObjType: GlobalVars[i].objtype,
-			}
+			return i, &GlobalVars[i].ExprData
 		}
 	}
 	c.ErrorAtCurrent(fmt.Sprintf("Global variable '%s' not found", tok.ToString()))
@@ -347,13 +346,11 @@ func (c *Compiler) ResolveLocal(fn *FunctionVar, name string) (int16, *Expressio
 	// Work our way backwards from the bottom of the locals store so we can
 	// identify the variable at lowest scope relative to this one
 	for i := fn.LocalCount - 1; i >= 0; i-- {
-
 		if c.IdentifiersEqual(name, fn.Locals[i].name) {
 			if fn.Locals[i].depth == -1 {
 				c.Error("Cannot read local variable in its own initializer.")
 			}
-
-			return i, &ExpressionData{Value: fn.Locals[i].dataType, ObjType: fn.Locals[i].objtype}
+			return i, &fn.Locals[i].ExprData
 		}
 	}
 	return -1, nil
@@ -380,7 +377,7 @@ func (c *Compiler) AddUpvalue(fn *FunctionVar, index int16, isLocal bool) int16 
 	// Create a new closure
 	fn.Upvalues[upvCount].IsLocal = isLocal
 	fn.Upvalues[upvCount].Index = index
-	fn.Upvalues[upvCount].dataType = fn.Enclosing.Locals[index].dataType
+	fn.Upvalues[upvCount].ExprData = fn.Enclosing.Locals[index].ExprData
 	fn.UpvalueCount++
 
 	return fn.UpvalueCount - 1
@@ -500,26 +497,25 @@ func (c *Compiler) NamedList(tok Token) {
 
 func (c *Compiler) NamedArray(tok Token) {
 
+	// This gets the address of the entire array
 	idx, expData, varscope := c.ResolveVariable(tok)
-
+	// Push the array on to the stack
 	if varscope == GLOBAL {
-		c.EmitInstr(OP_GET_AGLOBAL, idx)
+		c.EmitInstr(OP_GET_GLOBAL, idx)
 	} else {
-		c.EmitInstr(OP_GET_ALOCAL, idx)
+		c.EmitInstr(OP_GET_LOCAL, idx)
 	}
+	c.WriteComment(fmt.Sprintf("Array name %s Location %d of type %s", tok.ToString(), idx,ValueTypeLabel[expData.Value]))
 	dims := 0
+	c.Consume(TOKEN_LEFT_BRACKET,"Expect '[' after array name")
 	for {
-		if c.Match(TOKEN_LEFT_BRACKET) {
-			dims++
-			c.Expression()
-			c.Consume(TOKEN_RIGHT_BRACKET,"']' must follow array index reference")
-		} else {
+		c.Expression()
+		dims++
+		if !c.Match(TOKEN_COMMA) {
 			break
 		}
 	}
-
-	PushExpressionValue(expData)
-	c.WriteComment(fmt.Sprintf("Array name %s Index %d of type %s", tok.ToString(), idx,ValueTypeLabel[expData.Value]))
+	c.Consume(TOKEN_RIGHT_BRACKET,"']' must follow array index reference")
 
 	if c.Match(TOKEN_EQUAL) {
 		c.Expression()
@@ -530,16 +526,11 @@ func (c *Compiler) NamedArray(tok Token) {
 			c.EmitInstr(OP_SET_ALOCAL, idx)
 		}
 		c.WriteComment(fmt.Sprintf("Array name %s Index %d", tok.ToString(), idx))
-	}/* else {
-		if varscope == GLOBAL {
-			c.EmitInstr(OP_GET_AGLOBAL, idx)
-		} else {
-			c.EmitInstr(OP_GET_ALOCAL, idx)
-		}
+	} else {
+		c.EmitInstr(OP_AINDEX,int16(dims))
+		c.WriteComment(fmt.Sprintf("Getting array index with %d dimensions",dims))
 		PushExpressionValue(expData)
-		c.WriteComment(fmt.Sprintf("Array name %s Index %d of type %s", tok.ToString(), idx,ValueTypeLabel[expData.Value]))
-
-	}*/
+	}
 
 }
 
@@ -683,29 +674,29 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 				GlobalVars[idx].Class = CurrentClass
 			}
 
-			if GlobalVars[idx].datatype != valType || GlobalVars[idx].objtype != objType {
-				gVar := ValueTypeLabel[GlobalVars[idx].datatype]
-				gObj := VarTypeLabel[ GlobalVars[idx].objtype]
+			if GlobalVars[idx].ExprData.Value != valType || GlobalVars[idx].ExprData.ObjType != objType {
+				gVar := ValueTypeLabel[GlobalVars[idx].ExprData.Value]
+				gObj := VarTypeLabel[ GlobalVars[idx].ExprData.ObjType]
 				errStr := fmt.Sprintf("Variable %s is a %s of type %s: cannot assign a %s of type %s",
 					tok.ToString(),gObj,gVar,VarTypeLabel[objType],ValueTypeLabel[valType])
 				c.Error(errStr)
 			}
 
 		} else if isLocal {
-			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].dataType {
+			if c.Current.Locals[idx].IsInitialized && valType != c.Current.Locals[idx].ExprData.Value {
 				c.Error("Cannot assign incompatible variable")
 			}
 
 			c.Current.Locals[idx].IsInitialized = true
-			c.Current.Locals[idx].dataType = valType
-			c.Current.Locals[idx].objtype = objType
+			c.Current.Locals[idx].ExprData.Value = valType
+			c.Current.Locals[idx].ExprData.ObjType = objType
 
 			if objType == VAR_CLASS {
 				c.Current.Locals[idx].Class = CurrentClass
 			}
 
 		} else if isUpvalue {
-			c.Current.Upvalues[idx].dataType = valType
+			c.Current.Upvalues[idx].ExprData.Value = valType
 			if objType == VAR_CLASS {
 				c.Current.Upvalues[idx].Class = CurrentClass
 			}
@@ -719,20 +710,20 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 			c.EmitOp(getOp)
 		}
 		if isGlobal {
-			valType = GlobalVars[idx].datatype
-			objType = GlobalVars[idx].objtype
+			valType = GlobalVars[idx].ExprData.Value
+			objType = GlobalVars[idx].ExprData.ObjType
 			if objType == VAR_CLASS {
 				CurrentClass = GlobalVars[idx].Class
 			}
 
 		} else if isLocal {
-			valType = c.Current.Locals[idx].dataType
-			objType = c.Current.Locals[idx].objtype
+			valType = c.Current.Locals[idx].ExprData.Value
+			objType = c.Current.Locals[idx].ExprData.ObjType
 			if objType == VAR_CLASS {
 				CurrentClass = c.Current.Locals[idx].Class
 			}
 		} else if isUpvalue {
-			valType = c.Current.Upvalues[idx].dataType
+			valType = c.Current.Upvalues[idx].ExprData.Value
 			if objType == VAR_CLASS {
 				CurrentClass = c.Current.Upvalues[idx].Class
 			}
@@ -790,15 +781,13 @@ func (c *Compiler) DefineParameter() {
 	}
 
 	index = c.AddLocal(tok.ToString())
-	c.Current.Locals[index].dataType = valType
+	c.Current.Locals[index].ExprData.Value = valType
 
 }
 
 // This function is called to make sense of variable declarations where we
 // declare the type before the variable name
 func (c *Compiler) GetDataType() ExpressionData {
-	// We use this fnu
-
 	expd := new(ExpressionData)
 
 	switch {
@@ -806,11 +795,17 @@ func (c *Compiler) GetDataType() ExpressionData {
 	case c.Check(TOKEN_TYPE_INTEGER):
 		c.Advance()
 		if c.Match(TOKEN_LEFT_BRACKET) {
-			// Close it out
+			dims:=0
+			for {
+				dims++
+				if !c.Match(TOKEN_COMMA) {
+					break
+				}
+			}
 			c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after array dimension declaration")
-
 			expd.ObjType = VAR_ARRAY
 			expd.Value = VAL_INTEGER
+			expd.Dimensions = dims
 		} else 	{
 			expd.ObjType = VAR_SCALAR
 			expd.Value = VAL_INTEGER
@@ -873,8 +868,7 @@ func (c *Compiler) AddGlobal(varName string) int16 {
 func (c *Compiler) DeclareGlobalVariable(varName string, declaredType ExpressionData) {
 
 	index := c.AddGlobal(varName)
-	GlobalVars[index].objtype = declaredType.ObjType
-	GlobalVars[index].datatype = declaredType.Value
+	GlobalVars[index].ExprData = declaredType
 
 	if c.Match(TOKEN_EQUAL) {
 		// This is the value we're going to assign
@@ -882,8 +876,9 @@ func (c *Compiler) DeclareGlobalVariable(varName string, declaredType Expression
 		expressionType := PopExpressionValue()
 		// The types don't match
 		if (expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType) &&
-			declaredType.Value != VAL_NIL {
+			expressionType.ObjType != declaredType.ObjType ||
+			expressionType.Dimensions != declaredType.Dimensions) &&
+				declaredType.Value != VAL_NIL {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
 				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
@@ -891,7 +886,7 @@ func (c *Compiler) DeclareGlobalVariable(varName string, declaredType Expression
 			c.Error(errStr)
 		}
 		// If the do, we continue here
-
+		PushExpressionValue(expressionType)
 		c.EmitInstr(OP_SET_GLOBAL, index)
 	}
 
@@ -913,8 +908,8 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 	}
 	//opcode = OP_SET_LOCAL
 	index := c.AddLocal(varName)
-	c.Current.Locals[index].objtype = declaredType.ObjType
-	c.Current.Locals[index].dataType = declaredType.Value
+	c.Current.Locals[index].ExprData.ObjType = declaredType.ObjType
+	c.Current.Locals[index].ExprData.Value = declaredType.Value
 	c.Current.Locals[index].name = varName
 
 	if c.Match(TOKEN_EQUAL) {
@@ -940,6 +935,8 @@ func (c *Compiler) DeclareVariable() {
 
 	expData := c.GetDataType()
 	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
+
+	PushExpressionValue(expData)
 
 	// Store the token here
 	tok := c.Parser.Previous
@@ -1498,9 +1495,9 @@ func (c *Compiler) Array(canAssign bool) {
 }
 func (c *Compiler) Index(canAssign bool) {
 
-	c.Expression()
-	c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after index reference")
-	c.EmitOp(OP_AINDEX)
+	//c.Expression()
+	//c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after index reference")
+	//c.EmitOp(OP_AINDEX)
 }
 
 func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
@@ -2181,8 +2178,8 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	// if it's a method, we add the current class as a parameter
 	if functionType == TYPE_METHOD {
 		c.Current.Locals[c.Current.LocalCount].name = "this"
-		c.Current.Locals[c.Current.LocalCount].dataType = VAL_CLASS
-		c.Current.Locals[c.Current.LocalCount].objtype = VAR_CLASS
+		c.Current.Locals[c.Current.LocalCount].ExprData.Value = VAL_CLASS
+		c.Current.Locals[c.Current.LocalCount].ExprData.ObjType = VAR_CLASS
 		c.Current.Locals[c.Current.LocalCount].Class = CurrentClass
 		paramCount++
 	}
@@ -2399,8 +2396,26 @@ func (c *Compiler) WriteComment(comment string) {
 }
 
 func (c *Compiler) IntegerType(canAssign bool) {
-	c.EmitInstr(OP_PUSH, int16(VAL_INTEGER))
-	c.WriteComment("Push the integer type to the stack")
+
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		dims := int16(0)
+		for {
+			dims++
+			c.Expression()
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array type initializer")
+		c.EmitInstr(OP_PUSH,int16(VAL_INTEGER))
+		c.EmitInstr(OP_MAKE_ARRAY,dims)
+		PushExpressionValue(ExpressionData{
+			Value:      VAL_INTEGER,
+			ObjType:    VAR_ARRAY,
+			Dimensions: int(dims),
+		})
+	}
+
 }
 
 func GetTokenType(tokType TokenType) ValueType {
