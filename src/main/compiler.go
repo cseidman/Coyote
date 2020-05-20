@@ -868,8 +868,8 @@ func (c *Compiler) AddGlobal(varName string) int16 {
 	return GlobalCount - 1
 }
 
-func (c *Compiler) MatchTypes( ExpressionData, data2 ExpressionData) bool {
-	return (data1.Value !=data2.Value || data1.ObjType != data2.ObjType ||	data1.Dimensions != data2.Dimensions) &&
+func (c *Compiler) MatchTypes( data1 ExpressionData, data2 ExpressionData) bool {
+	return !(data1.Value !=data2.Value || data1.ObjType != data2.ObjType ||	data1.Dimensions != data2.Dimensions) &&
 	data2.Value != VAL_NIL
 }
 
@@ -1361,39 +1361,6 @@ func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ValueT
 	return VAL_NIL
 }
 
-func (c *Compiler) Dot(canAssign bool) {
-	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after '.'.")
-	name := c.Parser.Previous.ToString()
-
-	isMethod := c.Match(TOKEN_LEFT_PAREN) // Is this is a method?
-
-	idx := c.MakeConstant(ObjString(name))
-	vType := c.FindPropertyType(CurrentClass, name)
-
-	if isMethod {
-		c.CallMethod(idx)
-	} else {
-
-		var getOp byte
-		var setOp byte
-
-		getOp = OP_GET_PROPERTY
-		setOp = OP_SET_PROPERTY
-
-		if canAssign && c.Match(TOKEN_EQUAL) {
-			c.Expression()
-			c.EmitInstr(setOp, idx)
-		} else {
-			c.EmitInstr(getOp, idx)
-			c.WriteComment(fmt.Sprintf("Name '%s' of type %s", name, ValueTypeLabel[vType]))
-			PushExpressionValue(ExpressionData{
-				Value:   vType,
-				ObjType: VAR_SCALAR,
-			})
-		}
-	}
-}
-
 func (c *Compiler) List(canAssign bool) {
 	keys := int16(0)
 	var keyType ValueType
@@ -1472,7 +1439,27 @@ func (c *Compiler) Array(canAssign bool) {
 	elements := int16(0)
 	var dType ValueType
 
+	dimCount := int16(0)
+
+	// Pushing a multidimensional array
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		for {
+			dimCount++
+			c.Expression()
+
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect right bracket after dimensional sizing")
+	} else {
+		dimCount++
+	}
+	c.EmitPushInteger(dimCount)
+	c.WriteComment(fmt.Sprintf("Dimensions of array type: %d",dimCount))
+
 	for {
+
 		c.Expression()
 		valType := PopExpressionValue().Value
 		if elements == 0 {
@@ -1494,15 +1481,21 @@ func (c *Compiler) Array(canAssign bool) {
 	PushExpressionValue(ExpressionData{
 		Value:   dType,
 		ObjType: VAR_ARRAY,
-		Dimensions: 1,
+		Dimensions: int(dimCount),
 	})
 
 }
 func (c *Compiler) Index(canAssign bool) {
+	expData := PopExpressionValue()
 
-	//c.Expression()
-	//c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after index reference")
-	//c.EmitOp(OP_AINDEX)
+	c.Expression()
+	expData.ObjType = VAR_SCALAR
+	expData.Dimensions = 0
+	PushExpressionValue(expData)
+	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index reference")
+	c.EmitInstr(OP_AINDEX, int16(1))
+
+
 }
 
 func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
@@ -1687,9 +1680,12 @@ func (c *Compiler) ExpressionStatement() {
 	c.Expression()
 	// After the expression gets evaluated, we display it on the output device
 	// That's what makes this a "statement" rather than an expression only
-	c.Consume(TOKEN_CR, "Expect 'CR' after expression.")
+	//c.Consume(TOKEN_CR, "Expect 'CR' after expression.")
 	//c.EmitOp(OP_POP)
 	//c.WriteComment("Pop After expression statement")
+	if c.Match(TOKEN_CR) {
+
+	}
 }
 
 func (c *Compiler) Block() {
@@ -2411,13 +2407,23 @@ func (c *Compiler) PushType(valType ValueType) {
 			}
 		}
 		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array type initializer")
+
 		c.EmitInstr(OP_PUSH,int16(valType))
+		c.WriteComment(fmt.Sprintf("Specifying value type as %s", ValueTypeLabel[valType]))
+
 		c.EmitInstr(OP_MAKE_ARRAY,dims)
+		c.WriteComment(fmt.Sprintf("Make array with %d dimensions", dims))
+
 		PushExpressionValue(ExpressionData{
 			Value:      valType,
 			ObjType:    VAR_ARRAY,
 			Dimensions: int(dims),
 		})
+		// If there's a left brace, then it means we're also filling the value with data
+		if c.Match(TOKEN_LEFT_BRACE) {
+			c.Expression()
+			c.Consume(TOKEN_RIGHT_BRACE, "Right brace expected after array expression")
+		}
 	}
 }
 

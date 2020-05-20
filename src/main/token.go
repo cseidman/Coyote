@@ -268,8 +268,8 @@ const (
 	PREC_FACTOR // * /
 	PREC_UNARY  // ! -
 	PREC_CALL   // . ()
-	PREC_INDEX
 	PREC_ARRAY // . @[]
+	PREC_INDEX
 	PREC_LIST  //. 	@{}
 	PREC_PRIMARY
 )

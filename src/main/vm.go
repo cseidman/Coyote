@@ -600,6 +600,7 @@ func (v *VM) Dispatch(opCode byte) {
 		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
 		oList.SetValue(index, val)
+
 	case OP_GET_HLOCAL:
 		elem := v.Pop()
 		slot := v.GetOperandValue()
@@ -791,10 +792,23 @@ func (v *VM) Dispatch(opCode byte) {
 		for i := elements - 1; i >= 0; i-- {
 			o[i] = v.Pop()
 		}
+
+		dimCount := int(v.Pop().(ObjInteger))
+		dims := make([]int,dimCount)
+		// If the dimension count is greater than 1, then we need to grab the indexes
+		// otherwise, we won't have the number on the stack
+		if dimCount > 1 {
+			for i := dimCount - 1; i >= 0; i-- {
+				dims[i] = int(v.Pop().(ObjInteger))
+			}
+		}
+
 		v.Push(&ObjArray{
 			ElementCount: int(elements),
 			ElementTypes: ValueType(dType),
 			Elements:     o,
+			DimCount: dimCount,
+			Dimensions: dims,
 		})
 	case OP_SCAN:
 		v.Scan()
@@ -802,6 +816,10 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_ASIZE:
 		array := v.Peek(1).(ObjArray)
 		v.Push(ObjInteger(int64(array.ElementCount)))
+
+	case OP_HKEY:
+		key := v.Pop()
+		v.Push(v.Pop().(*ObjList).GetValue(key))
 
 	case OP_AINDEX:
 		dims := v.GetOperandValue()

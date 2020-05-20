@@ -127,6 +127,7 @@ const (
 	OP_DROP_TABLE
 	OP_IRANGE
 	OP_MAKE_ARRAY
+	OP_HKEY
 )
 
 var OpLabel = map[byte]string{
@@ -281,5 +282,6 @@ var OpLabel = map[byte]string{
 
 	OP_IRANGE:		 "OP_IRANGE",
 	OP_MAKE_ARRAY:   "OP_MAKE_ARRAY",
+	OP_HKEY:		 "OP_HKEY",
 
 }

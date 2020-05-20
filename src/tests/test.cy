@@ -1,2 +1,6 @@
-var int[] x = @[0,1,2,3,4,5]
-println(x[1])
+var list veggies = list[float]
+veggies$Tomatoes = 2.00
+veggies$Celery = 3.50
+veggies$Spinach = 2.75
+
+println(veggies$Celery)
