@@ -290,8 +290,13 @@ func (s *Scanner) PeekNext() byte {
 func (s *Scanner) SkipWhitespace() {
 	for {
 		c := s.Peek()
+
+		//if unicode.IsSpace(rune(c)) {
+		//	s.Advance()
+		//}
+
 		switch c {
-		case '\r', ' ', '\v', '\f', '\t':
+		case '\r', ' ', '\v', '\f', '\t' :
 			s.Advance()
 		case '\n':
 			if s.CurrentCRMode() {

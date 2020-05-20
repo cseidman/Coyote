@@ -785,6 +785,27 @@ func (c *Compiler) DefineParameter() {
 
 }
 
+func (c *Compiler) CheckArrayType(valueType ValueType) *ExpressionData {
+	var expd ExpressionData
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		dims:=0
+		for {
+			dims++
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+		c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after array dimension declaration")
+		expd.ObjType = VAR_ARRAY
+		expd.Value = valueType
+		expd.Dimensions = dims
+	} else 	{
+		expd.ObjType = VAR_SCALAR
+		expd.Value = valueType
+	}
+	return &expd
+}
+
 // This function is called to make sense of variable declarations where we
 // declare the type before the variable name
 func (c *Compiler) GetDataType() ExpressionData {
@@ -794,34 +815,16 @@ func (c *Compiler) GetDataType() ExpressionData {
 
 	case c.Check(TOKEN_TYPE_INTEGER):
 		c.Advance()
-		if c.Match(TOKEN_LEFT_BRACKET) {
-			dims:=0
-			for {
-				dims++
-				if !c.Match(TOKEN_COMMA) {
-					break
-				}
-			}
-			c.Consume(TOKEN_RIGHT_BRACKET,"Expect ']' after array dimension declaration")
-			expd.ObjType = VAR_ARRAY
-			expd.Value = VAL_INTEGER
-			expd.Dimensions = dims
-		} else 	{
-			expd.ObjType = VAR_SCALAR
-			expd.Value = VAL_INTEGER
-		}
+		expd = c.CheckArrayType(VAL_INTEGER)
+	case c.Check(TOKEN_TYPE_BOOL):
+		c.Advance()
+		expd = c.CheckArrayType(VAL_BOOL)
 	case c.Check(TOKEN_TYPE_FLOAT):
-		{
-			c.Advance()
-			expd.ObjType = VAR_SCALAR
-			expd.Value = VAL_FLOAT
-		}
+		c.Advance()
+		expd = c.CheckArrayType(VAL_FLOAT)
 	case c.Check(TOKEN_TYPE_STRING):
-		{
-			c.Advance()
-			expd.ObjType = VAR_SCALAR
-			expd.Value = VAL_STRING
-		}
+		c.Advance()
+		expd = c.CheckArrayType(VAL_STRING)
 	case c.Check(TOKEN_FUNC):
 		{
 			c.Advance()
@@ -865,20 +868,24 @@ func (c *Compiler) AddGlobal(varName string) int16 {
 	return GlobalCount - 1
 }
 
+func (c *Compiler) MatchTypes( ExpressionData, data2 ExpressionData) bool {
+	return (data1.Value !=data2.Value || data1.ObjType != data2.ObjType ||	data1.Dimensions != data2.Dimensions) &&
+	data2.Value != VAL_NIL
+}
+
 func (c *Compiler) DeclareGlobalVariable(varName string, declaredType ExpressionData) {
 
 	index := c.AddGlobal(varName)
 	GlobalVars[index].ExprData = declaredType
 
 	if c.Match(TOKEN_EQUAL) {
+
 		// This is the value we're going to assign
 		c.Expression()
 		expressionType := PopExpressionValue()
+
 		// The types don't match
-		if (expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType ||
-			expressionType.Dimensions != declaredType.Dimensions) &&
-				declaredType.Value != VAL_NIL {
+		if !c.MatchTypes(expressionType, declaredType) {
 
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
 				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
@@ -917,10 +924,7 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 		c.Expression()
 		expressionType := PopExpressionValue()
 		// The types don't match
-		if (expressionType.Value != declaredType.Value ||
-			expressionType.ObjType != declaredType.ObjType) &&
-			declaredType.Value != VAL_NIL {
-
+		if !c.MatchTypes(expressionType, declaredType) {
 			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
 				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
 				ValueTypeLabel[expressionType.Value], VarTypeLabel[expressionType.ObjType])
@@ -954,7 +958,7 @@ func (c *Compiler) DeclareVariable() {
 		//scope = LOCAL
 		c.DeclareLocalVariable(tok.ToString(), expData)
 	}
-	c.ClearCR()
+
 }
 
 func (c *Compiler) IdentifiersEqual(a string, b string) bool {
@@ -1490,6 +1494,7 @@ func (c *Compiler) Array(canAssign bool) {
 	PushExpressionValue(ExpressionData{
 		Value:   dType,
 		ObjType: VAR_ARRAY,
+		Dimensions: 1,
 	})
 
 }

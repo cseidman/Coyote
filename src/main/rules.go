@@ -46,7 +46,7 @@ func (c *Compiler) LoadRules() {
 		// 30
 		{c.Unary, nil, c.Postary, PREC_INCR}, // TOKEN_PLUS_PLUS
 		{nil, nil, c.Postary, PREC_NONE},     // TOKEN_MINUS_MINUS
-		{c.Array, nil, nil, PREC_ARRAY},      // TOKEN_ARRAY
+		{c.Array, nil, nil, PREC_NONE},      // TOKEN_ARRAY
 		{c.List, nil, nil, PREC_LIST},        // TOKEN_LIST
 		{c.Variable, nil, nil, PREC_NONE},    // TOKEN_IDENTIFIER
 		{c.String, nil, nil, PREC_NONE},      // TOKEN_STRING
