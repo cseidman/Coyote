@@ -218,7 +218,7 @@ var add_2 = func(y:int) int {
 add_2(5)
 // 7
 ```
-Now suppose you need another function that instead adds 5 to its argument. The natural thing to do would be to write another function, just like add_2, where the 2 is replaced with a 7. But this would be grossly inefficient: if in the future you discover that you made a mistake and you in fact need to multiply the values instead of add them, you would be forced to change the code in two places. In this trivial example, that may not be much trouble, but for more complicated projects, duplicating code is a recipe for disaster.
+Now suppose you need another function that instead adds 7 to its argument. The natural thing to do would be to write another function, just like add_2, where the 2 is replaced with a 7. But this would be grossly inefficient: if in the future you discover that you made a mistake and you in fact need to multiply the values instead of add them, you would be forced to change the code in two places. In this trivial example, that may not be much trouble, but for more complicated projects, duplicating code is a recipe for disaster.
 
 A better idea would be to write a function that takes one argument, x, that returns another function which adds its argument, y, to x. In other words, something like this:
 
