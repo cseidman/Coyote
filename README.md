@@ -28,7 +28,7 @@ To get started, you may download the latest version from https://github.com/csei
 ## Declaring Variables
 
 Variables are created by using the `var` statement followed by the variable type and name. Ex: 
-`var int MyVariable` or you can initialize it at the same time like this: `var int MyVariable = 45`
+`var int MyVariable` or you can initialize it at the same time like this: `var MyVariable = 45` and the variable will be initialized by the value type
 
 In Coyote, you must assign a type to a variable, which stays the same until it's re-declared. Ex:
 ```{Coyote}
