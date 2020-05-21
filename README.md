@@ -170,3 +170,57 @@ if x == size.LARGE {
 }
 // It's large
 ```
+
+### Functions
+Functions don't have names, they return a function *type* which is stored in a variable. If you pass parameters, you must use a name:type expression followed by a return type if there is one. If there is a declared return type, it must be explicitely returned with the ```return``` keyword
+```
+var f = func(x:int, y:int) int {
+    return x * y
+}
+
+println(f(4,5))
+// 20
+
+```
+Functions can be passed as parameters to other functions:
+```
+var f = func(fn:func) {
+    fn()
+}
+
+var SayHello = func() {
+    println("Hi")
+}
+
+var SayBye = func() {
+    println("Bye")
+}
+
+f(SayHello)
+f(SayBye)
+
+// Hi
+// Bye
+```
+A closure in Coyote is a function bound to the environment the closure was created in. These functions maintain access to the scope in which they were defined, allowing for powerful design patterns similar to concepts of functional programing
+
+Suppose you want a function that adds 2 to its argument. You would likely write something like this:
+```
+var add_2 = func(y:int) int {
+    return 2 + y
+}
+add_2(5)
+// 7
+```
+Now suppose you need another function that instead adds 5 to its argument. The natural thing to do would be to write another function, just like add_2, where the 2 is replaced with a 7. But this would be grossly inefficient: if in the future you discover that you made a mistake and you in fact need to multiply the values instead of add them, you would be forced to change the code in two places. In this trivial example, that may not be much trouble, but for more complicated projects, duplicating code is a recipe for disaster.
+
+A better idea would be to write a function that takes one argument, x, that returns another function which adds its argument, y, to x. In other words, something like this:
+
+```
+var add_x = func(x:int) func {
+    return func(y:int) int {
+        return x+y
+    }
+}
+```
+
