@@ -6,7 +6,10 @@ Unlike scripting languages, Coyote makes you declare your variables and provides
 To get started, you may download the latest version from https://github.com/cseidman/Coyote/releases 
 
 ## Table of Contents
-[Quick Introdution](#QuickIntroduction)
+[Quick Introdution](#quick-introduction)
+[Variable Types](#variable-types)
+[Composite Types](#composite-types)
+[Declaring Variables](#declaring-variables)
 
 # Quick Introduction
 
