@@ -133,7 +133,7 @@ veggies$Spinach = 2.75
 println(veggies$Celery)
 // 3.50000
 ```
-List of arrays:
+**List of arrays:**
 ```
 var x = @{
         "Q1":@["Jan","Feb","Mar"],
@@ -142,7 +142,7 @@ var x = @{
 println(x$Q2[1])
 // May
 ```  
-Array of Lists:
+**Array of Lists:**
 ```
 var food = @[
     @{"Carrots":1.75,"Celery":3.50, "Onions":0.75},
