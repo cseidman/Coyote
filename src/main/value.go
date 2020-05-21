@@ -125,6 +125,7 @@ type ObjUpvalue struct {
 
 type ObjList struct {
 	KeyType      ValueType
+	HValueType   ExpressionData
 	ElementCount int
 	List         map[HashKey]Obj
 }

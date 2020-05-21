@@ -128,6 +128,7 @@ const (
 	OP_IRANGE
 	OP_MAKE_ARRAY
 	OP_HKEY
+	OP_MAKE_LIST
 )
 
 var OpLabel = map[byte]string{
@@ -283,5 +284,6 @@ var OpLabel = map[byte]string{
 	OP_IRANGE:		 "OP_IRANGE",
 	OP_MAKE_ARRAY:   "OP_MAKE_ARRAY",
 	OP_HKEY:		 "OP_HKEY",
+	OP_MAKE_LIST:	 "OP_MAKE_LIST",
 
 }

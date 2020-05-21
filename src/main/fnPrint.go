@@ -27,7 +27,7 @@ var Out NativeFn = func(vm *VM, args int, argpos int) Obj {
 var Outln NativeFn = func(vm *VM, args int, argpos int) Obj {
 	x := vm.Pop()
 	fmt.Println(x.ShowValue())
-	vm.sp--
+	//vm.sp--
 	return nil
 }
 

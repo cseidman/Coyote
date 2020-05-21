@@ -1,6 +1,13 @@
-var list veggies = list[float]
-veggies$Tomatoes = 2.00
-veggies$Celery = 3.50
-veggies$Spinach = 2.75
+var size = enum {
+    XTRALARGE,
+    LARGE,
+    MEDIUM,
+    SMALL
+}
 
-println(veggies$Celery)
+var x = size.LARGE
+
+if x == size.LARGE {
+    println("It's large")
+}
+// It's large

@@ -31,7 +31,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},        // TOKEN_TILDE
 		{nil, nil, nil, PREC_NONE},        // TOKEN_QUESTION
 		{nil, c.Binary, nil, PREC_FACTOR}, // TOKEN_HAT
-		{nil, nil, nil, PREC_NONE},        // TOKEN_DOLLAR
+		{c.Dollar, nil, nil, PREC_NONE},        // TOKEN_DOLLAR
 		// 20
 		{nil, nil, nil, PREC_NONE},            // TOKEN_BAR
 		{nil, nil, nil, PREC_NONE},            // TOKEN_BACKTICK
@@ -124,7 +124,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PRIVATE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PUBLIC
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED
-		{nil, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
+		{c.NewList, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_INDEX
 		{c.New, nil, nil, PREC_NONE}, // TOKEN_NEW
 	}
