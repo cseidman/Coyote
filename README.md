@@ -10,6 +10,13 @@ To get started, you may download the latest version from https://github.com/csei
 * [Variable Types](#variable-types)
 * [Composite Types](#composite-types)
 * [Declaring Variables](#declaring-variables)
+* [Arrays](#arrays)
+* [Multi-dimensional Arrays](multi-dimensional-arrays)
+* [Lists](#lists)
+* [List of Arrays](#list-of-arrays)
+* [Array of Lists](#array-of-lists)
+* [Enums](#enums)
+* [Functions](#functions)
 
 # Quick Introduction
 
