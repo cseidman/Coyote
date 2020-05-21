@@ -152,7 +152,7 @@ var food = @[
 println(food[0]$Celery)
 println(food[1]$Pork)
 // 3.5000
-// 5.5700
+// 5.7500
 ```
 #### Enums
 Enums elements represent ```int``` values
