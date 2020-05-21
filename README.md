@@ -5,3 +5,169 @@ Unlike scripting languages, Coyote makes you declare your variables and provides
 
 To get started, you may download the latest version from https://github.com/cseidman/Coyote/releases 
 
+# Quick Introduction
+
+## Declaring Variables
+
+Variables are created by using the `var` statement followed by the variable type and name. Ex: 
+`var int MyVariable` or you can initialize it at the same time like this: `var int MyVariable = 45`
+
+In Coyote, you must assign a type to a variable, which stays the same until it's re-declared. Ex:
+```{Coyote}
+var lastName string
+lastName = "Jones"
+
+// This is fine
+var firstName = "Fred"
+
+var x int
+x = 100
+println(x)
+
+var y = 200
+
+// Error
+firstName = 100
+[line 9] Error at '100': Variable firstName is a Scalar of type string: cannot assign a Scalar of type integer
+
+
+```
+### Variable Types
+| Type | Description  |
+|--|--|
+| int | 64 bit integer |
+| float | 64 bit float  |
+| string | string |
+| byte | 8 bit byte |
+| bool | boolean true/false |
+
+### Composite Types
+| Type | Description  |
+|--|--|
+| class | lightweight OOP-style class |
+| enum | enum of type byte  |
+| array | collection of variables |
+| list | associative array/hash table  |
+| matrix | mathematical matrix |
+
+#### Arrays
+Declaring arrays 
+```
+var x int[] 
+var y float[] 
+var z bool[] 
+...
+```
+You can also declare it as a sized array
+```
+var x = new int[3]
+x[0] = 100
+x[1] = 101
+x[2] = 1
+
+println(x[1])
+// 101
+
+```
+If the array is initialized at the same time as it's declared, it takes the size of the initializer
+```
+var y = @[10,20,30]
+println(y[1])
+// 20
+```
+A declared but uninitialized array can be initialized (and sized) later 
+```
+var z int[]
+z = @[200,201,2]
+println(z[1])
+// 201
+```
+
+#### Multi-Dimensional Arrays
+Dimensions in an array are delimited by commas. One comma indicates two dimension, two commas mean three dimensions, and so on. There is no practical limit to how many dimensions you can declare in an array. 
+```
+var x = new int[3,3]
+var y = 0
+for i = 0 to 2 {
+    for j = 0 to 2 {
+        x[i,j] = y
+        y = y + 1
+    }
+}
+println(x[1,1])
+// 4
+```
+As with regular arrays, the variable can be sized in advance
+```
+var m = new int[2,3,4]
+var y = 0
+for i = 0 to 1 {
+    for j = 0 to 2 {
+        for v = 0 to 3 {
+            m[i,j,v] = y
+            y = y + 1
+        }
+    }
+}
+println(m[1,1,1])
+// 17
+
+```
+To declare a multi-dimensional array and initialize it at the same time, you can add ```[int,int]``` at the beginning of the declaration of the array elements:
+```
+var x = @[[3,3]0,1,2,3,4,5,6,7,8]
+x[2,2] = 4
+x[1,1] = 1
+x[0,0] = 100
+println(x[2,2])
+```  
+#### Lists 
+Lists contain elements of different types like − numbers, strings, arrays and even another list inside it. A list can also contain a matrix or a function as its elements. List is created as follows:
+```
+var l = @{"One":1, "Two":2, "Three":3}
+
+var veggies = list[string,float]
+veggies$Tomatoes = 2.00
+veggies$Celery = 3.50
+veggies$Spinach = 2.75
+
+println(veggies$Celery)
+// 3.50000
+```
+List of arrays:
+```
+var x = @{
+        "Q1":@["Jan","Feb","Mar"],
+        "Q2":@["Apr","May","June"]
+        }
+println(x$Q2[1])
+// May
+```  
+Array of Lists:
+```
+var food = @[
+    @{"Carrots":1.75,"Celery":3.50, "Onions":0.75},
+    @{"Beef":4.55,"Pork":5.75,"Chicken":2.80}
+]
+println(food[0]$Celery)
+println(food[1]$Pork)
+// 3.5000
+// 5.5700
+```
+#### Enums
+Enums elements represent ```int``` values
+```
+var size = enum {
+    XTRALARGE,
+    LARGE,
+    MEDIUM,
+    SMALL
+}
+
+var x = size.LARGE
+
+if x == size.LARGE {
+    println("It's large")
+}
+// It's large
+```
