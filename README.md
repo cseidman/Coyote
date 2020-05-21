@@ -3,7 +3,7 @@ Welcome to Coyote - a fast, lightweight language designed for data engineers in 
 
 Unlike scripting languages, Coyote makes you declare your variables and provides the security that comes from compile-time type checking. At the same time, it offers extensive data manipulation structures that can be combined as needed. Multi-dimensional arrays can contain classes and functions, functions can be stored in Data Frames, and all objects can be passed as parameters to functions or methods.
 
-To get started, you may download the latest version from [here](../releases) 
+To get started, you may download the latest version from [here](releases) 
 
 ## Table of Contents
 * [Quick Introdution](#quick-introduction)
