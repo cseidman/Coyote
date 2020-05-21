@@ -7,6 +7,24 @@ To get started, you may download the latest version from https://github.com/csei
 
 # Quick Introduction
 
+### Variable Types
+| Type | Description  |
+|--|--|
+| int | 64 bit integer |
+| float | 64 bit float  |
+| string | string |
+| byte | 8 bit byte |
+| bool | boolean true/false |
+
+### Composite Types
+| Type | Description  |
+|--|--|
+| class | lightweight OOP-style class |
+| enum | enum of type byte  |
+| array | collection of variables |
+| list | associative array/hash table  |
+| matrix | mathematical matrix |
+
 ## Declaring Variables
 
 Variables are created by using the `var` statement followed by the variable type and name. Ex: 
@@ -29,26 +47,7 @@ var y = 200
 // Error
 firstName = 100
 [line 9] Error at '100': Variable firstName is a Scalar of type string: cannot assign a Scalar of type integer
-
-
 ```
-### Variable Types
-| Type | Description  |
-|--|--|
-| int | 64 bit integer |
-| float | 64 bit float  |
-| string | string |
-| byte | 8 bit byte |
-| bool | boolean true/false |
-
-### Composite Types
-| Type | Description  |
-|--|--|
-| class | lightweight OOP-style class |
-| enum | enum of type byte  |
-| array | collection of variables |
-| list | associative array/hash table  |
-| matrix | mathematical matrix |
 
 #### Arrays
 Declaring arrays 
