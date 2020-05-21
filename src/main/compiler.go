@@ -730,8 +730,9 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		}
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
-
 	PushExpressionValue(ExpressionData{Value: valType, ObjType: objType})
+
+
 }
 
 func (c *Compiler) IdentifierConstant() int16 {
@@ -838,11 +839,14 @@ func (c *Compiler) GetDataType() ExpressionData {
 			expd.Value = VAL_CLASS
 		}
 	case c.Check(TOKEN_LIST_TYPE):
-		{
 			c.Advance()
+			expd.Value = VAL_STRING
 			expd.ObjType = VAR_HASH
-			expd.Value = VAL_LIST
-		}
+	case c.Check(TOKEN_ENUM):
+		c.Advance()
+		expd.Value = VAL_ENUM
+		expd.ObjType = VAR_ENUM
+
 	default:
 		{
 			expd.ObjType = VAR_UNKNOWN
@@ -873,33 +877,23 @@ func (c *Compiler) MatchTypes( data1 ExpressionData, data2 ExpressionData) bool 
 	data2.Value != VAL_NIL
 }
 
-func (c *Compiler) DeclareGlobalVariable(varName string, declaredType ExpressionData) {
+func (c *Compiler) DeclareGlobalVariable(varName string) {
 
 	index := c.AddGlobal(varName)
-	GlobalVars[index].ExprData = declaredType
-
 	if c.Match(TOKEN_EQUAL) {
-
 		// This is the value we're going to assign
 		c.Expression()
-		expressionType := PopExpressionValue()
+		GlobalVars[index].ExprData = PopExpressionValue()
 
-		// The types don't match
-		if !c.MatchTypes(expressionType, declaredType) {
-
-			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
-				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
-				ValueTypeLabel[expressionType.Value], VarTypeLabel[expressionType.ObjType])
-			c.Error(errStr)
-		}
-		// If the do, we continue here
-		PushExpressionValue(expressionType)
 		c.EmitInstr(OP_SET_GLOBAL, index)
+		c.WriteComment(fmt.Sprintf("Setting global variable %s at location %d",varName,index))
+	} else {
+		GlobalVars[index].ExprData = c.GetDataType()
 	}
 
 }
 
-func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionData) {
+func (c *Compiler) DeclareLocalVariable(varName string) {
 
 	// Check if this variable was already declared in the current scope
 	for i := c.Current.LocalCount - 1; i >= 0; i-- {
@@ -915,34 +909,22 @@ func (c *Compiler) DeclareLocalVariable(varName string, declaredType ExpressionD
 	}
 	//opcode = OP_SET_LOCAL
 	index := c.AddLocal(varName)
-	c.Current.Locals[index].ExprData.ObjType = declaredType.ObjType
-	c.Current.Locals[index].ExprData.Value = declaredType.Value
 	c.Current.Locals[index].name = varName
 
 	if c.Match(TOKEN_EQUAL) {
 		// This is the value we're going to assign
 		c.Expression()
-		expressionType := PopExpressionValue()
-		// The types don't match
-		if !c.MatchTypes(expressionType, declaredType) {
-			errStr := fmt.Sprintf("Variable %s is %s:%s and expression is %s:%s",
-				varName, ValueTypeLabel[declaredType.Value], VarTypeLabel[declaredType.ObjType],
-				ValueTypeLabel[expressionType.Value], VarTypeLabel[expressionType.ObjType])
-			c.Error(errStr)
-		}
-		// If the do, we continue here
+		c.Current.Locals[index].ExprData = PopExpressionValue()
+
 		c.EmitInstr(OP_SET_LOCAL, index)
+	} else {
+		c.Current.Locals[index].ExprData = c.GetDataType()
 	}
 }
 
 func (c *Compiler) DeclareVariable() {
 
-	expData := c.GetDataType()
 	c.Consume(TOKEN_IDENTIFIER, "Expect variable name")
-
-	PushExpressionValue(expData)
-
-	// Store the token here
 	tok := c.Parser.Previous
 
 	// Error if this variable collides with an existing native function name
@@ -953,10 +935,10 @@ func (c *Compiler) DeclareVariable() {
 	//var scope VariableScope
 	if c.ScopeDepth == 0 {
 		//scope = GLOBAL
-		c.DeclareGlobalVariable(tok.ToString(), expData)
+		c.DeclareGlobalVariable(tok.ToString())
 	} else {
 		//scope = LOCAL
-		c.DeclareLocalVariable(tok.ToString(), expData)
+		c.DeclareLocalVariable(tok.ToString())
 	}
 
 }
@@ -1177,6 +1159,14 @@ func (c *Compiler) GetArguments() int16 {
 	return argCount
 }
 
+func (c *Compiler) Dollar(canAssign bool) {
+	c.Consume(TOKEN_IDENTIFIER,"Expect key name after '$'")
+	keyVal := c.Parser.Previous.ToString()
+	idx := c.MakeConstant(ObjString(keyVal))
+	c.EmitInstr(OP_HKEY,idx)
+	c.WriteComment(fmt.Sprintf("Getting list value key %s",keyVal))
+}
+
 func (c *Compiler) New(canAssign bool) {
 
 	var valType ValueType
@@ -1186,25 +1176,26 @@ func (c *Compiler) New(canAssign bool) {
 		valType = VAL_INTEGER
 	case c.Match(TOKEN_TYPE_FLOAT):
 		valType = VAL_FLOAT
+	case c.Match(TOKEN_LIST_TYPE):
+		// Defer to the new list expression
+		c.NewList(canAssign)
+		valType = VAL_LIST
 	}
 
 	// Loop in order to handle multi-dimensional arrays
 	dims := int16(0)
+	c.Consume(TOKEN_LEFT_BRACKET, "Expect '[' after new array declaration")
 	for {
-		c.Consume(TOKEN_LEFT_BRACKET, "Expect '[' after new array declaration")
 		c.Expression()
-		c.EmitOp(OP_MAKE_ARRAY)
-		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after new array declaration")
-
 		dims++
-		if !c.Check(TOKEN_LEFT_BRACKET) {
+		if !c.Match(TOKEN_COMMA) {
 			// Nor more dimensions
 			break
 		}
 	}
-
-	c.EmitInstr(OP_PUSH,dims)
-	c.EmitOp(OP_ARRAY)
+	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after new array declaration")
+	c.EmitInstr(OP_PUSH,int16(valType))
+	c.EmitInstr(OP_MAKE_ARRAY, int16(dims))
 	PushExpressionValue(ExpressionData{
 		Value: valType,
 		ObjType: VAR_ARRAY,
@@ -1261,15 +1252,6 @@ func (c *Compiler) Binary(canAssign bool) {
 
 	data := PopExpressionValue()
 
-	//rtype := c.CurrentInstructions().GetType(0)
-
-	//if ltype != rtype {
-	//	c.ErrorAtCurrent("Types don't match")
-	//	return
-	//}
-	// This is the value for both types
-
-	// Emit the operator instruction.
 	switch operatorType {
 	case TOKEN_BANG_EQUAL:
 		c.EmitOp(OP_NOT_EQUAL)
@@ -1361,6 +1343,25 @@ func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ValueT
 	return VAL_NIL
 }
 
+func (c *Compiler) NewList(canAssign bool) {
+	// If this is on the right side
+	if c.Match(TOKEN_LEFT_BRACKET) {
+		keyType := c.GetDataType()
+		c.Consume(TOKEN_COMMA,"Expect ',' between data types in list allocation")
+		valType := c.GetDataType()
+		c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after list allocation")
+
+		c.EmitPushInteger(int16(VarType(valType.ObjType)))
+		c.EmitPushInteger(int16(ValueType(valType.Value)))
+		c.EmitPushInteger(int16(ValueType(keyType.Value)))
+
+		c.EmitOp(OP_MAKE_LIST)
+		PushExpressionValue(ExpressionData{keyType.Value, valType.ObjType ,1})
+	}
+	// Left side, do nothing
+
+}
+
 func (c *Compiler) List(canAssign bool) {
 	keys := int16(0)
 	var keyType ValueType
@@ -1409,7 +1410,7 @@ func (c *Compiler) List(canAssign bool) {
 func (c *Compiler) Enum(canAssign bool) {
 	elements := uint8(0)
 	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' after 'enum'")
-	c.ClearCR()
+
 	for {
 		c.Consume(TOKEN_IDENTIFIER, "Expect enum element")
 		name := c.Parser.Previous.ToString()
@@ -1419,12 +1420,10 @@ func (c *Compiler) Enum(canAssign bool) {
 		if elements > 255 {
 			c.Error("Enums cannot have more than 255 elements")
 		}
-		c.ClearCR()
 		if !c.Match(TOKEN_COMMA) {
 			break
 		}
 
-		c.ClearCR()
 	}
 	c.Consume(TOKEN_RIGHT_BRACE, "Expect '}' to close enum definition")
 	c.EmitInstr(OP_ENUM, int16(elements))
@@ -1476,8 +1475,13 @@ func (c *Compiler) Array(canAssign bool) {
 	}
 
 	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after array definition")
+
 	c.EmitInstr(OP_PUSH, elements)
+	c.WriteComment(fmt.Sprintf("Push number of elements %d ",elements))
+
 	c.EmitInstr(OP_ARRAY, int16(dType))
+	c.WriteComment(fmt.Sprintf("Array of type %s ",ValueTypeLabel[dType]))
+
 	PushExpressionValue(ExpressionData{
 		Value:   dType,
 		ObjType: VAR_ARRAY,
@@ -1486,16 +1490,13 @@ func (c *Compiler) Array(canAssign bool) {
 
 }
 func (c *Compiler) Index(canAssign bool) {
-	expData := PopExpressionValue()
-
 	c.Expression()
+	expData := PopExpressionValue()
 	expData.ObjType = VAR_SCALAR
 	expData.Dimensions = 0
 	PushExpressionValue(expData)
 	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index reference")
 	c.EmitInstr(OP_AINDEX, int16(1))
-
-
 }
 
 func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
@@ -1559,9 +1560,9 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 
 func (c *Compiler) Variable(canAssign bool) {
 
-	tok := &c.Parser.Previous
+	tok := &c.Parser.Previous // Variable token
 
-	var expData *ExpressionData
+	var expData *ExpressionData // Value and type data
 
 	var foundCompoundObject bool
 
@@ -1597,15 +1598,21 @@ func (c *Compiler) Variable(canAssign bool) {
 			}
 		case VAR_ENUM:
 			c.EmitInstr(OP_ENUM_TAG, idx)
+			PushExpressionValue(ExpressionData{VAL_ENUM,VAR_ENUM,1})
 		default:
 			// Uh oh ..
 			c.Error(fmt.Sprintf("Compound variable %s of type %s should not have a dot after it", tok.ToString(), VarTypeLabel[expData.ObjType]))
 		}
-
 	}
 
 	if !foundCompoundObject {
 		c.NamedVariable(canAssign)
+	}
+
+	// Next we check to see if this variable has further indications such as
+	// array of hashes or hash of arrays, etc.
+	if c.Check(TOKEN_LEFT_BRACKET) || c.Check(TOKEN_DOLLAR) || c.Check(TOKEN_DOT) {
+		c.Expression()
 	}
 
 }
@@ -2363,10 +2370,15 @@ func (c *Compiler) SelectStatement() {
 	}
 }
 
+func (c *Compiler) Allocate() {
+
+}
+
 func (c *Compiler) Statement() {
 
 	switch {
 		case c.Match(TOKEN_VAR): 		c.DeclareVariable()
+		case c.Match(TOKEN_NEW):        c.Allocate()
 		case c.Match(TOKEN_IF):			c.IfStatement()
 		case c.Match(TOKEN_RETURN):		c.ReturnStatement()
 		case c.Match(TOKEN_SCAN): 		c.ScanStatement()
@@ -2424,6 +2436,8 @@ func (c *Compiler) PushType(valType ValueType) {
 			c.Expression()
 			c.Consume(TOKEN_RIGHT_BRACE, "Right brace expected after array expression")
 		}
+	} else {
+		PushExpressionValue(ExpressionData{valType, VAR_SCALAR,1})
 	}
 }
 

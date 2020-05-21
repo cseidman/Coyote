@@ -87,7 +87,7 @@ func (v *VM) Pop() Obj {
 }
 
 func (v *VM) Peek(distance int) Obj {
-	return v.Stack[v.sp-distance-1] //v.Frame.slots[v.Frame.slotptr-distance-1]
+	return v.Stack[v.sp-distance-1]
 }
 
 func (v *VM) GetOperandValue() int16 {
@@ -617,6 +617,9 @@ func (v *VM) Dispatch(opCode byte) {
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
 		oList.SetValue(index, val)
 
+	case OP_HKEY:
+		key := v.GetOperand().(ObjString)
+		v.Push(v.Pop().(*ObjList).GetValue(key))
 	case OP_GET_GLOBAL_0:
 		v.Push(v.Globals[0])
 	case OP_GET_GLOBAL_1:
@@ -769,18 +772,30 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_CONTINUE:
 
+	case OP_MAKE_LIST:
+
+		keyType := ValueType(v.Pop().(ObjInteger))
+		valType := ValueType(v.Pop().(ObjInteger))
+		objType := VarType(v.Pop().(ObjInteger))
+
+		lObj := new(ObjList)
+		lObj.ElementCount = 0
+		lObj.HValueType = ExpressionData{valType, objType, 1}
+		lObj.KeyType = keyType
+		lObj.List = make(map[HashKey]Obj)
+
+		v.Push(lObj)
+
 	case OP_LIST:
 
 		keyCount := int64(v.Pop().(ObjInteger))
 		keyType := v.GetByte()
-
 		lObj := new(ObjList)
 		lObj.Init(ValueType(keyType), int(keyCount))
 		for i := int64(0); i < keyCount; i++ {
 			val := v.Pop()
 			key := v.Pop()
 			lObj.AddNew(key, val) // Key, Value
-
 		}
 		v.Push(lObj)
 
@@ -816,10 +831,6 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_ASIZE:
 		array := v.Peek(1).(ObjArray)
 		v.Push(ObjInteger(int64(array.ElementCount)))
-
-	case OP_HKEY:
-		key := v.Pop()
-		v.Push(v.Pop().(*ObjList).GetValue(key))
 
 	case OP_AINDEX:
 		dims := v.GetOperandValue()
@@ -866,8 +877,7 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_ENUM_TAG:
 		key := string(v.GetOperand().(ObjString))
-		enumObj := v.Peek(1).(*ObjEnum)
-		v.sp--
+		enumObj := v.Pop().(*ObjEnum)
 		v.Push(enumObj.GetItem(key))
 
 	case OP_IRANGE:

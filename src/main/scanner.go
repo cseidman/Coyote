@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
+	//"unicode/utf8"
 )
 
 var NULLCHAR = []byte("\000")[0]
@@ -60,7 +62,7 @@ func (s *Scanner) ScanToken() Token {
 		s.PopCRMode()
 		return s.MakeToken(TOKEN_RIGHT_PAREN)
 	case '{':
-		s.PushCRMode(false)
+		s.PushCRMode(true)
 		return s.MakeToken(TOKEN_LEFT_BRACE)
 	case '}':
 		s.PopCRMode()
@@ -138,7 +140,7 @@ func (s *Scanner) ScanToken() Token {
 		return s.String()
 
 	default:
-		log.Panicf("Unrecognized character byte:%d char: %U", b, b)
+		log.Panicf("Unrecognized character byte:%d char: %#U", b, b)
 	}
 	return s.MakeToken(TOKEN_IDENTIFIER)
 }
@@ -291,9 +293,10 @@ func (s *Scanner) SkipWhitespace() {
 	for {
 		c := s.Peek()
 
-		//if unicode.IsSpace(rune(c)) {
-		//	s.Advance()
-		//}
+		// Unicode issues
+		if fmt.Sprintf("%U",c) == "U+0020" {
+
+		}
 
 		switch c {
 		case '\r', ' ', '\v', '\f', '\t' :
@@ -302,8 +305,10 @@ func (s *Scanner) SkipWhitespace() {
 			if s.CurrentCRMode() {
 				s.Line++
 				s.Advance()
+			} else {
+				return
 			}
-			return
+
 		case '/':
 			// If the next character is a *
 			if s.PeekNext() == '*' {
