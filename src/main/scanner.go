@@ -14,6 +14,7 @@ type Scanner struct {
 	Line        int
 	SkipCRDepth int
 	SkipCRMode  []bool
+	SQLMode		bool
 	ScanDepth   int
 }
 
@@ -27,7 +28,7 @@ func NewScanner(source *string) Scanner {
 
 		SkipCRDepth: 0,
 		SkipCRMode:  make([]bool, 256),
-
+		SQLMode: false,
 		ScanDepth: 0,
 	}
 
@@ -289,8 +290,13 @@ func (s *Scanner) PeekNext() byte {
 func (s *Scanner) SkipWhitespace() {
 	for {
 		c := s.Peek()
+
+		//if unicode.IsSpace(rune(c)) {
+		//	s.Advance()
+		//}
+
 		switch c {
-		case '\r', ' ', '\v', '\f', '\t':
+		case '\r', ' ', '\v', '\f', '\t' :
 			s.Advance()
 		case '\n':
 			if s.CurrentCRMode() {

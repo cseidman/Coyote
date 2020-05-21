@@ -124,6 +124,10 @@ const (
 	OP_CALL_NATIVE
 	OP_ENUM
 	OP_ENUM_TAG
+	OP_DROP_TABLE
+	OP_IRANGE
+	OP_MAKE_ARRAY
+	OP_HKEY
 )
 
 var OpLabel = map[byte]string{
@@ -274,4 +278,10 @@ var OpLabel = map[byte]string{
 	OP_CALL_NATIVE:  "OP_CALL_NATIVE",
 	OP_ENUM:         "OP_ENUM",
 	OP_ENUM_TAG:     "OP_ENUM_TAG",
+	OP_DROP_TABLE:   "OP_DROP_TABLE",
+
+	OP_IRANGE:		 "OP_IRANGE",
+	OP_MAKE_ARRAY:   "OP_MAKE_ARRAY",
+	OP_HKEY:		 "OP_HKEY",
+
 }

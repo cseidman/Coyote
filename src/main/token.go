@@ -92,8 +92,8 @@ const (
 	TOKEN_FROM
 	TOKEN_JOIN
 	TOKEN_LEFT
-	// 70
 	TOKEN_RIGHT
+	// 70
 	TOKEN_CROSSJOIN
 	TOKEN_WHERE
 	TOKEN_ALL
@@ -103,8 +103,8 @@ const (
 	TOKEN_INTO
 	TOKEN_VALUES
 	TOKEN_AS
-	// 80
 	TOKEN_ON
+	// 80
 	TOKEN_BROWSE
 	TOKEN_CREATE
 	TOKEN_TABLE
@@ -114,8 +114,8 @@ const (
 	TOKEN_HAVING
 	TOKEN_DISTINCT
 	TOKEN_TOP
-	//90
 	TOKEN_STEP
+	//90
 	TOKEN_TO
 	TOKEN_WHEN
 	TOKEN_CASE
@@ -131,6 +131,8 @@ const (
 	TOKEN_PUBLIC
 	TOKEN_PROTECTED
 	TOKEN_LIST_TYPE
+	TOKEN_INDEX
+	TOKEN_NEW
 )
 
 type TokenProperties struct {
@@ -184,7 +186,7 @@ var TokenLabels = map[string]TokenProperties{
 	"false":    {TOKEN_FALSE, true},
 	"for":      {TOKEN_FOR, true},
 	"func": 	{TOKEN_FUNC, true},
-	"select":   {TOKEN_SELECT, true},
+	"select":   {TOKEN_SELECT, false},
 	//40
 	"if":     {TOKEN_IF, true},
 	"nil":    {TOKEN_NIL, true},
@@ -248,6 +250,8 @@ var TokenLabels = map[string]TokenProperties{
 	"public":    {TOKEN_PUBLIC, false},
 	"protected": {TOKEN_PROTECTED, false},
 	"list": {TOKEN_LIST_TYPE, true},
+	"index": {TOKEN_INDEX, false},
+	"new": {TOKEN_NEW, true},
 }
 
 type Precedence byte
@@ -264,8 +268,8 @@ const (
 	PREC_FACTOR // * /
 	PREC_UNARY  // ! -
 	PREC_CALL   // . ()
-	PREC_INDEX
 	PREC_ARRAY // . @[]
+	PREC_INDEX
 	PREC_LIST  //. 	@{}
 	PREC_PRIMARY
 )

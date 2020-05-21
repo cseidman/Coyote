@@ -14,7 +14,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_PAREN
 		{nil, nil, nil, PREC_NONE},           // TOKEN_LEFT_BRACE
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACE
-		{nil, nil, nil, PREC_INDEX},          // TOKEN_LEFT_BRACKET
+		{c.Index, nil, nil, PREC_NONE},       // TOKEN_LEFT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_RIGHT_BRACKET
 		{nil, nil, nil, PREC_NONE},           // TOKEN_COMMA
 		{nil, nil, nil, PREC_CALL},           // TOKEN_DOT
@@ -46,7 +46,7 @@ func (c *Compiler) LoadRules() {
 		// 30
 		{c.Unary, nil, c.Postary, PREC_INCR}, // TOKEN_PLUS_PLUS
 		{nil, nil, c.Postary, PREC_NONE},     // TOKEN_MINUS_MINUS
-		{c.Array, nil, nil, PREC_ARRAY},      // TOKEN_ARRAY
+		{c.Array, nil, nil, PREC_NONE},      // TOKEN_ARRAY
 		{c.List, nil, nil, PREC_LIST},        // TOKEN_LIST
 		{c.Variable, nil, nil, PREC_NONE},    // TOKEN_IDENTIFIER
 		{c.String, nil, nil, PREC_NONE},      // TOKEN_STRING
@@ -74,10 +74,10 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE},       // TOKEN_EOF
 		{nil, nil, nil, PREC_NONE},       // TOKEN_INCLUDE
 		{c.IntegerType, nil, nil, PREC_NONE},       // TOKEN_TYPE_INTEGER
-		{nil, nil, nil, PREC_NONE},       // TOKEN_TYPE_FLOAT
-		{nil, nil, nil, PREC_NONE},       // TOKEN_TYPE_BOOL
+		{c.FloatType, nil, nil, PREC_NONE},       // TOKEN_TYPE_FLOAT
+		{c.BoolType, nil, nil, PREC_NONE},       // TOKEN_TYPE_BOOL
 		// 60
-		{nil, nil, nil, PREC_NONE},         // TOKEN_TYPE_STRING
+		{c.StringType, nil, nil, PREC_NONE},         // TOKEN_TYPE_STRING
 		{c._array, nil, nil, PREC_NONE},    // TOKEN_TYPE_ARRAY
 		{c.SqlSelect, nil, nil, PREC_NONE}, // TOKEN_SELECT
 		{nil, nil, nil, PREC_NONE},         // TOKEN_INSERT
@@ -125,6 +125,8 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PUBLIC
 		{nil, nil, nil, PREC_NONE}, // TOKEN_PROTECTED
 		{nil, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
+		{nil, nil, nil, PREC_NONE}, // TOKEN_INDEX
+		{c.New, nil, nil, PREC_NONE}, // TOKEN_NEW
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

@@ -15,7 +15,24 @@ type CallFrame struct {
 	slotptr int
 }
 
+type Database struct {
+	Name string
+	Tables map[string]ObjDataFrame
+	TableCount int
+}
+
+func (d *Database) AddTable(df ObjDataFrame) {
+	d.Tables[df.Name] = df
+	d.TableCount++
+}
+
+func (d *Database) DropTable(dfName string) {
+	delete(d.Tables, dfName)
+	d.TableCount--
+}
+
 type VM struct {
+	DataBases map[string]Database
 	Frames []CallFrame
 	Code   []byte
 	fp     int
@@ -27,6 +44,8 @@ type VM struct {
 
 	sp     int
 	prevSp int
+
+	CurrDb string // Current Database
 
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
@@ -140,11 +159,14 @@ func (v *VM) CloseUpvalues(last *Obj, objIndex int) {
 }
 
 func (v *VM) CallNative() {
-	native := *v.GetOperand().(*ObjNative).Function
+	native := v.GetOperand().(*ObjNative)
 	argCount := int(v.GetOperandValue())
-	result := native(v, argCount, v.sp-argCount)
+	fn := *native.Function
+	result := fn(v, argCount, v.sp-argCount)
 	v.sp += argCount
-	v.Push(result)
+	if native.hasReturn {
+		v.Push(result)
+	}
 }
 
 func (v *VM) MethodCall() {
@@ -214,9 +236,19 @@ func Exec(source *string, dbgMode bool) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
+		DataBases: make(map[string]Database),
 		DebugMode: dbgMode,
 	}
 	fn := Compile(source, dbgMode)
+
+	// Create a default database
+	vm.DataBases["main"] = Database{
+		Name:       "main",
+		Tables:     make(map[string]ObjDataFrame),
+		TableCount: 0,
+	}
+
+	vm.CurrDb = "main"
 
 	if fn == nil {
 		fmt.Println("Syntax error")
@@ -568,6 +600,7 @@ func (v *VM) Dispatch(opCode byte) {
 		index := v.ReadConstant(int16(v.Pop().(ObjInteger)))
 		oList := v.Globals[v.GetOperandValue()].(*ObjList)
 		oList.SetValue(index, val)
+
 	case OP_GET_HLOCAL:
 		elem := v.Pop()
 		slot := v.GetOperandValue()
@@ -639,22 +672,32 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SET_ALOCAL:
 		slot := v.GetOperandValue()
-		val := v.Peek(0)
-		elem := int64(v.Pop().(ObjInteger))
-		v.Stack[slot].(ObjArray).Elements[elem] = val
+		val := v.Pop()
+		arr := v.Stack[slot].(ObjArray)
+		dimCount := arr.DimCount
+		elems := make([]int64,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elems[i] = int64(v.Pop().(ObjInteger))
+		}
+		v.Stack[slot].(ObjArray).SetElement(val, elems...)
 		v.sp-- // Pop
 
 	case OP_GET_AGLOBAL:
 		elem := int64(v.Pop().(ObjInteger))
 		idx := v.GetOperandValue()
 		pval := v.Globals[idx]
-		v.Push(pval.(ObjArray).Elements[elem])
+		v.Push(pval.(*ObjArray).Elements[elem])
 
 	case OP_SET_AGLOBAL:
 		idx := v.GetOperandValue()
 		val := v.Pop()
-		elem := int(v.Peek(0).(ObjInteger))
-		v.Globals[idx].(ObjArray).Elements[elem] = val
+		arr := v.Globals[idx].(*ObjArray)
+		dimCount := arr.DimCount
+		elems := make([]int64,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elems[i] = int64(v.Pop().(ObjInteger))
+		}
+		v.Globals[idx].(*ObjArray).SetElement(val, elems...)
 		v.sp-- // Pop
 
 	case OP_POP:
@@ -749,10 +792,23 @@ func (v *VM) Dispatch(opCode byte) {
 		for i := elements - 1; i >= 0; i-- {
 			o[i] = v.Pop()
 		}
-		v.Push(ObjArray{
+
+		dimCount := int(v.Pop().(ObjInteger))
+		dims := make([]int,dimCount)
+		// If the dimension count is greater than 1, then we need to grab the indexes
+		// otherwise, we won't have the number on the stack
+		if dimCount > 1 {
+			for i := dimCount - 1; i >= 0; i-- {
+				dims[i] = int(v.Pop().(ObjInteger))
+			}
+		}
+
+		v.Push(&ObjArray{
 			ElementCount: int(elements),
 			ElementTypes: ValueType(dType),
 			Elements:     o,
+			DimCount: dimCount,
+			Dimensions: dims,
 		})
 	case OP_SCAN:
 		v.Scan()
@@ -761,11 +817,41 @@ func (v *VM) Dispatch(opCode byte) {
 		array := v.Peek(1).(ObjArray)
 		v.Push(ObjInteger(int64(array.ElementCount)))
 
-	case OP_AINDEX:
-		index := v.Peek(0).(ObjInteger)
-		array := v.Peek(1).(ObjArray)
+	case OP_HKEY:
+		key := v.Pop()
+		v.Push(v.Pop().(*ObjList).GetValue(key))
 
-		v.Push(array.Elements[int64(index)])
+	case OP_AINDEX:
+		dims := v.GetOperandValue()
+		indexes := make([]int64,dims)
+		for i:=dims-1;i>=0;i-- {
+			indexes[i] = int64(v.Pop().(ObjInteger))
+		}
+
+		array := v.Pop().(*ObjArray)
+
+		v.Push(array.GetElement(indexes...))
+
+	case OP_MAKE_ARRAY:
+		valType := ValueType(v.Pop().(ObjInteger))
+		dimCount := v.GetOperandValue()
+		elemCount := 1
+
+		elemDim := make([]int,dimCount)
+		for i:=dimCount-1;i>=0;i-- {
+			elemDim[i] = int(v.Pop().(ObjInteger))
+			elemCount=elemCount*elemDim[i]
+		}
+
+		objArr := ObjArray{
+			ElementCount: elemCount,
+			ElementTypes: valType,
+			Elements:     make([]Obj,elemCount),
+		}
+
+		objArr.InitMulti(valType,elemCount,elemDim)
+
+		v.Push(&objArr)
 
 	case OP_ENUM:
 		elements := v.GetOperandValue()
@@ -783,6 +869,53 @@ func (v *VM) Dispatch(opCode byte) {
 		enumObj := v.Peek(1).(*ObjEnum)
 		v.sp--
 		v.Push(enumObj.GetItem(key))
+
+	case OP_IRANGE:
+		endRange := int64(v.Pop().(ObjInteger))
+		startRange := int64(v.Pop().(ObjInteger))
+
+		v.Push(Range(startRange,endRange))
+
+	case OP_CREATE_TABLE:
+		df := v.GetOperand().(ObjDataFrame)
+		db := v.DataBases[v.CurrDb]
+		db.AddTable(df)
+
+	case OP_DROP_TABLE:
+		tableName := string(v.GetOperand().(ObjString))
+		db := v.DataBases[v.CurrDb]
+		db.DropTable(tableName)
+
+	case OP_INSERT:
+
+		tableName := string(v.GetOperand().(ObjString))
+		valCount := v.GetOperandValue()
+
+		// Instance of the table
+		table := v.DataBases[v.CurrDb].Tables[tableName]
+		var cols []string
+		// If no columns were declared, we're going to get the column count from the
+		// table itself
+		if valCount == 0 {
+			cols = table.ColNames
+			valCount = int16(len(cols))
+		} else {
+			cols = make([]string,valCount)
+		}
+
+		vals := make([]Obj,valCount)
+		// Now get the values
+		for i := valCount-1; i >= 0; i-- {
+			vals[i] = v.Pop()
+		}
+
+		// Get the list of columns
+
+		for i := valCount-1; i >= 0; i-- {
+			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
+		}
+
+		table.AddRow(cols,vals)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
