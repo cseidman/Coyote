@@ -208,7 +208,7 @@ f(SayBye)
 // Hi
 // Bye
 ```
-A closure in Coyote is a function bound to the environment the closure was created in. These functions maintain access to the scope in which they were defined, allowing for powerful design patterns similar to concepts of functional programing
+A closure in Coyote is a function that is able to bind objects the closure used in the environment is was created in. These functions maintain access to the scope in which they were defined, allowing for powerful design patterns similar to concepts of functional programing
 
 Suppose you want a function that adds 2 to its argument. You would likely write something like this:
 ```
