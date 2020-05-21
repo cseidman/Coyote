@@ -218,9 +218,19 @@ A better idea would be to write a function that takes one argument, x, that retu
 
 ```
 var add_x = func(x:int) func {
-    return func(y:int) int {
+   return func(y:int) int {
         return x+y
-    }
+   }
 }
+
+var f = add_x(7)
+println(f(5))
+// 12
+
+var g = add_x(10)
+println(g(5))
+
+// 15
+
 ```
 
