@@ -7,7 +7,7 @@ Unlike scripting languages, Coyote makes you declare your variables and provides
 
 To get started, you may download the latest version from [here](https://github.com/cseidman/Coyote/releases) 
 
-## Table of Contents
+# Table of Contents
 * [Quick Introdution](#quick-introduction)
 * [Variable Types](#variable-types)
 * [Composite Types](#composite-types)
@@ -20,6 +20,14 @@ To get started, you may download the latest version from [here](https://github.c
 * [Enums](#enums)
 * [Functions](#functions)
    * [Closures](#functions)
+* [Control Flow](#control-flow)
+   * [If](#if)
+   * [Switch](#switch)
+   * [Case](#case)
+   * [While](#while)
+   * [For](#for)
+   * [Scan](#scan)  
+   * [Break and Continue](#break-continue)
 
 # Quick Introduction
 
@@ -318,6 +326,65 @@ while x <= 3 {
 // 2
 // 3
 ```
+### For
+The coyote **for** loop syntax is as follows:
+```for <variable name> = <integer expression> to <integer expression> [step <integer expression>]``` 
+If the variable name isn't already in scope, this statement will create it inside the scope of the loop. The integer expression used 
+in the clauses can be either constants or an expression that evaluates to an integer. If you omit the **step** clause, it'll default to 1
+
+Standard for loop
+```
+for i = 1 to 3 {
+   println(i)
+}
+// 1
+// 2
+// 3
+```
+For loop with a step
+```
+for i = 1 to 10 step 2 {
+   println(i)
+}
+// 1
+// 3
+// 5
+// 7
+// 9
+```
+We can use any expression that returns an integer to set the **to** ranges
+```
+var r = func() int {
+    return 4
+}
+
+for i = 1 to r() {
+   println(i)
+}
+// 1
+// 2
+// 3
+// 4
+```
+### Scan
+Scan is a way to iterate over object collections such as arrays and lists. The first element in the declaration is the name of the collection variable while the target variable is a scalar containing the value of the current iteration     
+```
+var x = new int[5]
+for i = 0 to 4 {
+    x[i] = i
+}
+
+scan x to y {
+    println(y)
+}
+// 0
+// 1
+// 2
+// 3
+// 4
+
+```
+### Break and Continue
 You can interrupt a loop prematurely using the **break** command
 ```
 var x = 1
@@ -334,7 +401,18 @@ while x <= 10 {
 // 3
 // Exit!
 ```
-Use continue to return to the original loop  
-
-### Scan
+Use **continue** to return to the original loop without running commands after this statement  
+```
+var x = 1
+while x < 5 {
+    x = x + 1
+    if x < 3 {
+        continue
+    }
+    println(x)
+}
+// 3
+// 4
+// 5
+```
  
