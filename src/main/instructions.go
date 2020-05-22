@@ -137,16 +137,19 @@ func (i *Instructions) SetOperand(instructionNumber int, value int16) {
 // These are to "tack on" extra operands
 func (i *Instructions) AddOperand32(value int32) {
 	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, Int32ToBytes(value)...)
+	i.OpCode[i.Count-1].BytePosition += 4
 	i.BytePosition += 4
 }
 
 func (i *Instructions) AddByteOperand(value byte) {
 	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, []byte{value}...)
+	i.OpCode[i.Count-1].BytePosition++
 	i.BytePosition++
 }
 
 func (i *Instructions) AddOperand(value int16) {
 	i.OpCode[i.Count-1].Operand = append(i.OpCode[i.Count-1].Operand, Int16ToBytes(value)...)
+	i.OpCode[i.Count-1].BytePosition += 2
 	i.BytePosition += 2
 }
 

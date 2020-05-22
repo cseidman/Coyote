@@ -1692,7 +1692,7 @@ func (c *Compiler) ExpressionStatement() {
 
 func (c *Compiler) Block() {
 	for !c.Check(TOKEN_RIGHT_BRACE) && !c.Check(TOKEN_EOF) {
-		c.Evaluate()
+		c.Statement()
 	}
 	c.Consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.")
 }
@@ -1894,7 +1894,7 @@ func (c *Compiler) WhileStatement() {
 	exitJump := c.EmitJump(OP_JUMP_IF_FALSE)
 	//c.EmitOp(OP_POP)
 
-	c.Evaluate()
+	c.Statement()
 	c.EndScope()
 
 	end := c.CurrentInstructions().NextBytePosition()
