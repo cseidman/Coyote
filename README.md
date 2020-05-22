@@ -334,7 +334,19 @@ while x <= 10 {
 // 3
 // Exit!
 ```
-Use continue to return to the original loop  
-
+Use **continue** to return to the original loop without running commands after this statement  
+```
+var x = 1
+while x < 5 {
+    x = x + 1
+    if x < 3 {
+        continue
+    }
+    println(x)
+}
+// 3
+// 4
+// 5
+```
 ### Scan
  
