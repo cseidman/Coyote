@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"strings"
-	//"unicode/utf8"
 )
 
 var NULLCHAR = []byte("\000")[0]
@@ -292,12 +290,6 @@ func (s *Scanner) PeekNext() byte {
 func (s *Scanner) SkipWhitespace() {
 	for {
 		c := s.Peek()
-
-		// Unicode issues
-		if fmt.Sprintf("%U",c) == "U+0020" {
-
-		}
-
 		switch c {
 		case '\r', ' ', '\v', '\f', '\t' :
 			s.Advance()

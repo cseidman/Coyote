@@ -710,7 +710,7 @@ func (v *VM) Dispatch(opCode byte) {
 		fmt.Println(v.Pop().ShowValue())
 
 	case OP_JUMP_IF_FALSE:
-		val := v.Peek(0)
+		val := v.Pop() //v.Peek(0)
 		jmpIndex := v.GetOperandValue()
 		if val.(*ObjBool).Value == false {
 			v.Frame.ip += int(jmpIndex)

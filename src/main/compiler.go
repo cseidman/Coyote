@@ -827,21 +827,17 @@ func (c *Compiler) GetDataType() ExpressionData {
 		c.Advance()
 		expd = c.CheckArrayType(VAL_STRING)
 	case c.Check(TOKEN_FUNC):
-		{
-			c.Advance()
-			expd.ObjType = VAR_FUNCTION
-			expd.Value = VAL_FUNCTION
-		}
+		c.Advance()
+		expd.ObjType = VAR_FUNCTION
+		expd.Value = VAL_FUNCTION
 	case c.Check(TOKEN_CLASS):
-		{
-			c.Advance()
-			expd.ObjType = VAR_CLASS
-			expd.Value = VAL_CLASS
-		}
+		c.Advance()
+		expd.ObjType = VAR_CLASS
+		expd.Value = VAL_CLASS
 	case c.Check(TOKEN_LIST_TYPE):
-			c.Advance()
-			expd.Value = VAL_STRING
-			expd.ObjType = VAR_HASH
+		c.Advance()
+		expd.Value = VAL_STRING
+		expd.ObjType = VAR_HASH
 	case c.Check(TOKEN_ENUM):
 		c.Advance()
 		expd.Value = VAL_ENUM
@@ -1067,7 +1063,6 @@ func (c *Compiler) ReturnStatement() {
 		c.EmitReturn()
 	} else {
 		c.Expression()
-		c.Consume(TOKEN_CR, "Expect CR after return value")
 		c.EmitOp(OP_RETURN)
 	}
 }
@@ -1764,9 +1759,9 @@ func (c *Compiler) BreakStatement() {
 
 func (c *Compiler) ContinueStatement() {
 	if PeekLoop() == LOOP_WHILE {
-		curLoc := c.CurrentInstructions().NextBytePosition() + 3
+		curLoc := c.CurrentInstructions().NextBytePosition() //+ 3
 		start := StartLoop[StartPtr]
-		offSet := start - curLoc
+		offSet := start - curLoc+3
 		c.EmitInstr(OP_JUMP, int16(offSet))
 		c.WriteComment(fmt.Sprintf("Continue to %d from %d by offset %d", start, curLoc, offSet))
 	} else if PeekLoop() == LOOP_FOR {
@@ -1891,15 +1886,13 @@ func (c *Compiler) WhileStatement() {
 	PushLoop(LOOP_WHILE)
 
 	start := c.CurrentInstructions().NextBytePosition()
-	//StartPtr++
-	//StartLoop[StartPtr] = start
 
 	// Logical expression should return a boolean
 	c.BeginScope()
 	c.Expression()
 
 	exitJump := c.EmitJump(OP_JUMP_IF_FALSE)
-	c.EmitOp(OP_POP)
+	//c.EmitOp(OP_POP)
 
 	c.Evaluate()
 	c.EndScope()
@@ -1909,7 +1902,7 @@ func (c *Compiler) WhileStatement() {
 	c.EmitLoop(-(end - start))
 	c.PatchJump(exitJump)
 
-	c.EmitOp(OP_POP)
+	//c.EmitOp(OP_POP)
 	c.PatchBreaks()
 
 	//StartPtr--
@@ -1919,7 +1912,7 @@ func (c *Compiler) WhileStatement() {
 
 func (c *Compiler) SwitchStatement() {
 	c.Expression()
-	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' after CASE <expr>")
+	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' after SWITCH <expr>")
 	// Clear out all CR after the brace
 	for c.Match(TOKEN_CR) {
 	}
@@ -2231,7 +2224,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 		c.EmitOp(OP_NIL)
 		c.WriteComment("In lieu of explicit return value")
 	}
-	c.ReturnStatement()
+	c.EmitReturn()
 	c.EndScope()
 	// Display
 	if c.DebugMode {
@@ -2266,7 +2259,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	}
 
 	PushExpressionValue(ExpressionData{
-		Value:   VAL_FUNCTION,//prev.returnType,
+		Value:   VAL_FUNCTION,
 		ObjType: VAR_FUNCTION,
 	})
 

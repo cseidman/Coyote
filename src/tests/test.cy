@@ -1,13 +1,8 @@
-var size = enum {
-    XTRALARGE,
-    LARGE,
-    MEDIUM,
-    SMALL
+var x = 1
+while x <= 20 {
+    x = x + 1
+    if x < 8 {
+        continue
+    }
+    println(x)
 }
-
-var x = size.LARGE
-
-if x == size.LARGE {
-    println("It's large")
-}
-// It's large
