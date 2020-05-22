@@ -19,6 +19,7 @@ To get started, you may download the latest version from [here](https://github.c
 * [Array of Lists](#array-of-lists)
 * [Enums](#enums)
 * [Functions](#functions)
+   * [Closures](#functions)
 
 # Quick Introduction
 
@@ -217,6 +218,7 @@ f(SayBye)
 // Hi
 // Bye
 ```
+#### Closures
 A closure in Coyote is a function that is able to bind objects the closure used in the environment is was created in. These functions maintain access to the scope in which they were defined, allowing for powerful design patterns similar to concepts of functional programing
 
 Suppose you want a function that adds 2 to its argument. You would likely write something like this:
