@@ -28,6 +28,7 @@ To get started, you may download the latest version from [here](https://github.c
    * [For](#for)
    * [Scan](#scan)  
    * [Break and Continue](#break-continue)
+* [Classes](#classes)
 
 # Quick Introduction
 
@@ -415,4 +416,5 @@ while x < 5 {
 // 4
 // 5
 ```
- 
+## Classes
+
