@@ -13,7 +13,7 @@ To get started, you may download the latest version from [here](https://github.c
 * [Composite Types](#composite-types)
 * [Declaring Variables](#declaring-variables)
 * [Arrays](#arrays)
-* [Multi-dimensional Arrays](multi-dimensional-arrays)
+* [Multi-dimensional Arrays](#multi-dimensional-arrays)
 * [Lists](#lists)
 * [List of Arrays](#list-of-arrays)
 * [Array of Lists](#array-of-lists)
