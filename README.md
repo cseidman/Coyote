@@ -348,5 +348,45 @@ while x < 5 {
 // 4
 // 5
 ```
+### For
+The coyote **for** loop syntax is as follows:
+```for <variable name> = <integer expression> to <integer expression> [step <integer expression>]``` 
+If the variable name isn't already in scope, this statement will create it inside the scope of the loop. The integer expression used 
+in the clauses can be either constants or an expression that evaluates to an integer. If you omit the **step** clause, it'll default to 1
+
+Standard for loop
+```
+for i = 1 to 3 {
+   println(i)
+}
+// 1
+// 2
+// 3
+```
+For loop with a step
+```
+for i = 1 to 10 step 2 {
+   println(i)
+}
+// 1
+// 3
+// 5
+// 7
+// 9
+```
+We can use any expression that returs an integer to set the **to** ranges
+```
+var r = func() int {
+    return 4
+}
+
+for i = 1 to r() {
+   println(i)
+}
+// 1
+// 2
+// 3
+// 4
+```
 ### Scan
  
