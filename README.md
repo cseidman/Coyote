@@ -250,4 +250,91 @@ println(g(5))
 // 15
 
 ```
+## Control Flow
+Control flow is the order in which we code and have our statements evaluated. That can be done by setting things to happen only if a condition or a set of conditions are met. Alternatively, we can also set an action to be computed for a particular number of times.
 
+### If
+```
+var f = func(x:int) {
+    if x > 5 {
+        println("> 5")
+    } else {
+        println("Not > 5")
+    }
+}
+
+f(4)
+f(6)
+// Not > 5
+// > 5
+```
+### Switch
+A switch statement is a shorter way to write a sequence of if/else statements. It executes the first case whose value matches the condition expression.
+```
+var f = func(x:int) string {
+    var msg string
+    switch x {
+        when 0: {msg = "Zero"}
+        when 1: {msg = "One"}
+        when 2: {msg = "Two"}
+        default: {msg = "Big number"}
+    }
+    return msg
+}
+
+println(f(2))
+println(f(6))
+// "Two"
+// "Big number"
+```
+### Case 
+Case is a variation of the 'switch' statement which doesn't use an initial condition expression. Instead, it tests individual expressions in each branch.
+```
+var f = func(x:int) string {
+    var msg string
+    case {
+        when x == 0: {msg = "Zero"}
+        when x == 1: {msg = "One"}
+        when x == 2: {msg = "Two"}
+        default: {msg = "Big number"}
+    }
+    return msg
+}
+
+println(f(2))
+println(f(6))
+// "Two"
+// "Big number"
+```
+### While
+While loops are used to loop until a specific condition is met
+```
+var x = 1
+while x <= 3 {
+    println(x)
+    x = x + 1
+}
+// 1
+// 2
+// 3
+```
+It's possible to break out of a loop prematurely as well
+```
+var x = 1
+while x <= 10 {
+    println(x)
+    x = x + 1
+    if x == 4 {
+        println("Exit!")
+        break
+    }
+}
+// 1
+// 2
+// 3
+// Exit!
+```
+Use continue to return to the original loop  
+
+### Scan
+ 
