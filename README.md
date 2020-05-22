@@ -20,6 +20,14 @@ To get started, you may download the latest version from [here](https://github.c
 * [Enums](#enums)
 * [Functions](#functions)
    * [Closures](#functions)
+* [Control Flow](#control-flow)
+   * [If](#if)
+   * [Switch](#switch)
+   * [Case](#case)
+   * [While](#while)
+   * [For](#for)
+   * [Scan](#scan)  
+   * [Break and Continue](#break-continue)
 
 # Quick Introduction
 
