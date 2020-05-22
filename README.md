@@ -318,7 +318,7 @@ while x <= 3 {
 // 2
 // 3
 ```
-It's possible to break out of a loop prematurely as well
+You can interrupt a loop prematurely using the **break** command
 ```
 var x = 1
 while x <= 10 {
