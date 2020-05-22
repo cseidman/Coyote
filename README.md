@@ -359,7 +359,23 @@ for i = 1 to r() {
 // 4
 ```
 ### Scan
+Scan is a way to iterate over object collections such as arrays and lists. The first element in the declaration is the name of the collection variable while the target variable is a scalar containing the value of the current iteration     
+```
+var x = new int[5]
+for i = 0 to 4 {
+    x[i] = i
+}
 
+scan x to y {
+    println(y)
+}
+// 0
+// 1
+// 2
+// 3
+// 4
+
+```
 ### Break and Continue
 You can interrupt a loop prematurely using the **break** command
 ```
