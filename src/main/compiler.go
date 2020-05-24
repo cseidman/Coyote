@@ -730,8 +730,6 @@ func (c *Compiler) NamedVariable(canAssign bool) {
 		c.WriteComment(fmt.Sprintf("%s name %s at index %d type %d", OpLabel[getOp], tok.ToString(), idx, valType))
 	}
 	PushExpressionValue(ExpressionData{Value: valType, ObjType: objType})
-
-
 }
 
 func (c *Compiler) IdentifierConstant() int16 {
@@ -1131,6 +1129,7 @@ func (c *Compiler) CallMethod(constantIndex int16) {
 	argumentCount := c.GetArguments() + 1
 	c.EmitInstr(OP_CALL_METHOD, constantIndex)
 	c.EmitOperand(argumentCount)
+	c.EmitOp(OP_POP)
 }
 
 func (c *Compiler) GetArguments() int16 {

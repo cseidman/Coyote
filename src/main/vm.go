@@ -197,8 +197,9 @@ func (v *VM) MethodCall() {
 		start := v.sp - int(argCount) - 1
 
 		v.Frame.slots = v.Stack[start:]
-		v.Frame.slotptr = start + 1
+		v.Frame.slotptr = start //+ 1
 	}
+
 
 }
 
@@ -513,6 +514,7 @@ func (v *VM) Dispatch(opCode byte) {
 		classInst := v.Peek(1).(*ObjInstance)
 		idx := string(v.GetOperand().(ObjString))
 		classInst.Fields[idx] = v.Pop()
+		v.sp--
 
 	case OP_GET_PROPERTY:
 		classInst := v.Pop().(*ObjInstance)
