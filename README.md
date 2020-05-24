@@ -23,6 +23,15 @@
    * [Scan](#scan)  
    * [Break and Continue](#break-continue)
 * [Classes](#classes)
+   * [Defining Classes](#defining-classes)
+   * [Properties](#properties)
+   * [Methods](#methods)
+   * [Inheritance](#inheritance)
+* [Comments](#comments)
+* [Concurrency](#concurrency)
+   * [Threads](#threads)
+   * [Thread Communication](#thread-communication)
+* [Modules](#modules)   
 
 # Quick Introduction
 Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP so that the tight integration between both produces a seamless experience that adds power to Data Science and Data Analytics. 
