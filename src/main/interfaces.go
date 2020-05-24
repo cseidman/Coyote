@@ -14,6 +14,7 @@ const (
 	VAR_MATRIX
 	VAR_TABLE
 	VAR_RANGE
+	VAR_OBJECT
 )
 
 var VarTypeLabel = map[VarType]string{
@@ -28,6 +29,8 @@ var VarTypeLabel = map[VarType]string{
 	VAR_MATRIX:   "Matrix",
 	VAR_TABLE: 	  "Table",
 	VAR_RANGE:	  "Range",
+	VAR_OBJECT:   "Object",
+
 }
 
 type ValueType byte
@@ -57,6 +60,7 @@ const (
 	VAL_MATRIX
 	VAL_TABLE
 	VAL_RANGE
+	VAL_OBJECT
 )
 
 var ValueTypeLabel = map[ValueType]string{
@@ -84,6 +88,7 @@ var ValueTypeLabel = map[ValueType]string{
 	VAL_MATRIX:     "Matrix",
 	VAL_TABLE:      "Table" ,
 	VAL_RANGE:      "Range" ,
+	VAL_OBJECT:     "Object" ,
 }
 
 type FunctionType byte
@@ -118,3 +123,4 @@ const (
 	UPVALUE
 	REGISTER
 )
+

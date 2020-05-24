@@ -59,7 +59,6 @@ func PopExpressionValue() ExpressionData {
 }
 
 // Utility
-
 func (c *Compiler) ClearCR() {
 	for {
 		if !c.Match(TOKEN_CR) {
@@ -1166,6 +1165,7 @@ func (c *Compiler) New(canAssign bool) {
 
 	var valType ValueType
 
+	// This is an array
 	switch {
 	case c.Match(TOKEN_TYPE_INTEGER):
 		valType = VAL_INTEGER
@@ -1175,8 +1175,15 @@ func (c *Compiler) New(canAssign bool) {
 		// Defer to the new list expression
 		c.NewList(canAssign)
 		valType = VAL_LIST
+	default:
+		c.Expression()
+		c.EmitOp(OP_OBJ_INSTANCE)
+		PushExpressionValue(ExpressionData{
+			Value: VAL_OBJECT,
+			ObjType: VAR_OBJECT,
+		})
+		return
 	}
-
 	// Loop in order to handle multi-dimensional arrays
 	dims := int16(0)
 	c.Consume(TOKEN_LEFT_BRACKET, "Expect '[' after new array declaration")
@@ -1501,8 +1508,8 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 	if name == "this" {
 		c.EmitOp(OP_GET_LOCAL_0)
 		return &ExpressionData{
-			Value:   VAL_CLASS,
-			ObjType: VAR_CLASS,
+			Value:   VAL_OBJECT,
+			ObjType: VAR_OBJECT,
 		}
 	}
 
@@ -1512,12 +1519,12 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 	if idx != -1 {
 		switch expData.ObjType {
 		// Is it a class?
-		case VAR_CLASS:
+		case VAR_OBJECT:
 			// Then treat this as a Class
 			c.EmitInstr(OP_GET_LOCAL, idx)
 			return &ExpressionData{
-				Value:   VAL_CLASS,
-				ObjType: VAR_CLASS,
+				Value:   VAL_OBJECT,
+				ObjType: VAR_OBJECT,
 			}
 		case VAR_ENUM:
 			c.EmitInstr(OP_GET_LOCAL, idx)
@@ -1533,12 +1540,12 @@ func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {
 	idx, expData = c.ResolveGlobal(tok)
 	if idx != -1 {
 		switch expData.ObjType {
-		case VAR_CLASS:
+		case VAR_OBJECT:
 			// Treat this as a Class
 			c.EmitInstr(OP_GET_GLOBAL, idx)
 			return &ExpressionData{
-				Value:   VAL_CLASS,
-				ObjType: VAR_CLASS,
+				Value:   VAL_OBJECT,
+				ObjType: VAR_OBJECT,
 			}
 		case VAR_ENUM:
 			c.EmitInstr(OP_GET_GLOBAL, idx)
@@ -1574,7 +1581,7 @@ func (c *Compiler) Variable(canAssign bool) {
 		idx := c.MakeConstant(ObjString(tok.ToString()))
 
 		switch expData.ObjType {
-		case VAR_CLASS:
+		case VAR_OBJECT:
 
 			if c.Match(TOKEN_LEFT_PAREN) {
 				// This is a method
@@ -2032,48 +2039,21 @@ func (c *Compiler) CaseStatement() {
 	c.EmitOp(OP_POP)
 }
 
-func (c *Compiler) CreateClassComponent(class *ClassVar, accessorType AccessorType) {
-	c.Consume(TOKEN_IDENTIFIER, "Expect property or method name after access indicator")
-
-	// Name of the property
-	pName := c.Parser.Previous.ToString()
-	// Use this to set the property
-	idx := c.MakeConstant(ObjString(pName))
-	c.AddProperty(class, pName)
-
-	if c.Match(TOKEN_EQUAL) {
-		if c.Match(TOKEN_METHOD) {
-			c.Method(true)
-			c.EmitInstr(OP_SET_PROPERTY, idx)
-		} else {
-
-		}
-	}
-
-}
-
 func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 	prop := &class.Properties[class.PropertyCount]
 
 	prop.Name = name
-	if c.Match(TOKEN_COLON) {
-		expData := c.GetDataType()
-		if expData.Value != VAL_NIL {
-			c.Advance()
-		}
-		prop.ObjType = expData.ObjType
-		prop.DataType = expData.Value
-
-	} else {
-		// This is a function
-		//expData := c.GetDataType()
-		prop.ObjType = VAR_FUNCTION
-		prop.DataType = VAL_CLOSURE
-	}
+	//prop.ObjType = expData.ObjType
+	//prop.DataType = expData.Value
 
 	prop.Index = class.PropertyCount
 	prop.EnclosingClass = class
+
+	idx := c.MakeConstant(ObjString(name))
+
+	c.EmitInstr(OP_BIND_PROPERTY,idx)
+	c.WriteComment(fmt.Sprintf("Property name %s index %d",prop.Name,prop.Index))
 
 	class.PropertyCount++
 
@@ -2081,22 +2061,16 @@ func (c *Compiler) AddProperty(class *ClassVar, name string) {
 
 }
 
-func (c *Compiler) ClassComponents(class *ClassVar) {
-	// Default Access indicator is public
-	accessType := PUBLIC
-
-	// If there's an explicit indicator, we consume it here
-	if c.Match(TOKEN_PUBLIC) ||
-		c.Match(TOKEN_PRIVATE) ||
-		c.Match(TOKEN_PROTECTED) {
-
-		accessType = PUBLIC
-	}
-	c.CreateClassComponent(class, accessType)
-}
-
 func (c *Compiler) this_(canAssign bool) {
 	c.Variable(false)
+}
+
+func (c *Compiler) GetAccessor() AccessorType {
+	switch {
+		case c.Match(TOKEN_PRIVATE): return PRIVATE
+		case c.Match(TOKEN_PROTECTED): return PROTECTED
+		default : return PUBLIC
+	}
 }
 
 func (c *Compiler) Class(canAssign bool) {
@@ -2118,22 +2092,34 @@ func (c *Compiler) Class(canAssign bool) {
 
 	c.EmitOp(OP_CLASS)
 
-	CurrentClass = &vclass
-	c.Consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.")
-	c.ClearCR()
-	// Keep going until we identified all properties and methods
-	for !c.Match(TOKEN_RIGHT_BRACE) && !c.Match(TOKEN_EOF) {
-		CurrentClass = &vclass
-		c.ClassComponents(&vclass)
-		c.ClearCR()
-	}
-	c.ClearCR()
-	PushExpressionValue(ExpressionData{
-		Value:   VAL_CLASS,
-		ObjType: VAR_CLASS,
-	})
-	ClassId--
+	c.Consume(TOKEN_LEFT_BRACE,"Expect '{' after class name")
+	for {
 
+		// Find out if it's public, protected, or private
+		_ = c.GetAccessor()
+		// Is it a property? if it is, it'll have a data type indicator. If not,
+		// it means it's a method
+		expData := c.GetDataType()
+		// Either way, the next token needs to be the name
+		c.Consume(TOKEN_IDENTIFIER,"Expect name of class component")
+		compName := c.Parser.Previous.ToString()
+		//idx := c.MakeConstant(ObjString(compName))
+		if expData.ObjType == VAR_UNKNOWN {
+			// It's a method .. so let's make one
+			c.Procedure(TYPE_METHOD)
+			c.AddProperty(&vclass, compName)
+		} else {
+			c.EmitOp(OP_NIL)
+			c.AddProperty(&vclass, compName)
+		}
+
+		// Ok, we're done
+		if c.Match(TOKEN_RIGHT_BRACE) {
+			break
+		}
+	}
+
+	ClassId--
 }
 
 func (c *Compiler) Method(canAssign bool) {
@@ -2193,7 +2179,7 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 	c.Consume(TOKEN_LEFT_PAREN, "Expect '(' after function definition.")
 	// Here we just count the parameters
 
-	if !c.Check(TOKEN_RIGHT_PAREN) {
+	for !c.Check(TOKEN_RIGHT_PAREN) {
 		for {
 			paramCount++
 			if paramCount > 1024 {
@@ -2364,7 +2350,7 @@ func (c *Compiler) SelectStatement() {
 }
 
 func (c *Compiler) Allocate() {
-
+	c.New(true)
 }
 
 func (c *Compiler) Statement() {

@@ -555,6 +555,32 @@ func (o ObjRange) Print() string {
 	return fmt.Sprintf("<%d..%d>",o.Start,o.End)
 }
 
+// Object Instance
+type ObjInstance struct  {
+	Class *ObjClass
+	Fields map[string]Obj
+}
+
+func (o ObjInstance) ShowValue() string {
+	return "<OBJ>"
+}
+
+func (o ObjInstance) Type() ValueType {
+	return VAL_CLASS
+}
+
+func (o ObjInstance) ToBytes() []byte {
+	panic("implement me")
+}
+
+func (o ObjInstance) ToValue() interface{} {
+	panic("implement me")
+}
+
+func (o ObjInstance) Print() string {
+	return "<OBJ>"
+}
+
 // Utility functions
 func MakeStringObj(str string) *ObjString {
 	s := ObjString(str)

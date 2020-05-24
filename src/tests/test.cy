@@ -1,19 +1,15 @@
-define class myClass {
-    properties {
-        int a
-        int b
+var myClass = class {
+    int a
+    int b
+    sum(x:int y:int) int {
+        return x+y+this.a+this.b
     }
-    methods {
-        void myClass() {
-            this.a = 6
-            this.b = 4
-        }
-        int sum(x:int y:int) {
-            return x+y+this.a+this.b
-        }
-    }
+
 }
 
-var myClass x = new myClass
+var x = new myClass
+x.a = 6
+x.b = 4
+
 println(x.sum(3,4))
-// Should print '17'
+// 17

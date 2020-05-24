@@ -173,7 +173,7 @@ func (v *VM) MethodCall() {
 
 	idx := string(v.GetOperand().(ObjString))
 	argCount := int(v.GetOperandValue())
-	classInst := v.Peek(argCount).(*ObjClass)
+	classInst := v.Peek(argCount).(*ObjInstance)
 
 	fld := classInst.Fields[idx]
 	if fld.Type() == VAL_NATIVE {
@@ -455,11 +455,15 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_BIND_PROPERTY:
 		propertyName := string(v.GetOperand().(ObjString))
 		class := v.Peek(1).(*ObjClass)
-
 		class.Fields[propertyName] = v.Pop()
 
-	case OP_CLASS:
+	case OP_OBJ_INSTANCE:
+		class := v.Pop().(*ObjClass)
+		iObj := &ObjInstance{Class:class}
+		iObj.Fields = class.Fields
+		v.Push(iObj)
 
+	case OP_CLASS:
 		class := &ObjClass{
 			Fields: make(map[string]Obj),
 		}
@@ -506,12 +510,12 @@ func (v *VM) Dispatch(opCode byte) {
 		v.MethodCall()
 
 	case OP_SET_PROPERTY:
-		classInst := v.Peek(1).(*ObjClass)
+		classInst := v.Peek(1).(*ObjInstance)
 		idx := string(v.GetOperand().(ObjString))
 		classInst.Fields[idx] = v.Pop()
 
 	case OP_GET_PROPERTY:
-		classInst := v.Pop().(*ObjClass)
+		classInst := v.Pop().(*ObjInstance)
 		idx := string(v.GetOperand().(ObjString))
 		v.Push(classInst.Fields[idx])
 
