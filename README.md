@@ -427,19 +427,19 @@ while x < 5 {
 ## Classes
 A class is a user-defined blueprint or prototype from which objects are created. Classes provide a means of bundling data and functionality together. Creating a new class creates a new type of object, allowing new instances of that type to be made. Each class instance can have attributes attached to it for maintaining its state. Class instances can also have methods (defined by its class) for modifying its state.
 ```
-define class myClass {
+var myClass = class {
     int a
     int b
-    myClass() {
-        this.a = 6
-        this.b = 4
-    }
     sum(x:int y:int) int {
         return x+y+this.a+this.b
     }
+
 }
 
-var myClass x = new myClass
+var x = new myClass
+x.a = 6
+x.b = 4
+
 println(x.sum(3,4))
 // 17
 
