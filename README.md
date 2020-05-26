@@ -42,7 +42,7 @@
    * [Delimited Files](#delmited-files)
    * [JSON Files](#json-files)
 * [Networking](#networking)
-   * [TCP Clients and Servers]   
+   * [TCP Clients and Servers](#tcp-clients-and-servers)  
 # Quick Introduction
 Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP so that the tight integration between both produces a seamless experience that adds power to Data Science and Data Analytics. 
 
