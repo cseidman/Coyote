@@ -1,13 +1,7 @@
 
 ![alt text](https://github.com/cseidman/Coyote/blob/master/logo.jpg)
+
 # Coyote
-Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP so that the tight integration between both provides a seamless experience that adds power to Data Science and Data Analytics. 
-
-Unlike scripting languages, Coyote makes you declare your variables and provides the security that comes from compile-time type checking. At the same time, it offers extensive data manipulation structures that can be combined as needed. Multi-dimensional arrays can contain classes and functions, functions can be stored in Data Frames, and all objects can be passed as parameters to functions or methods.
-
-To get started, you may download the latest version from [here](https://github.com/cseidman/Coyote/releases) 
-
-# Table of Contents
 * [Quick Introdution](#quick-introduction)
 * [Variable Types](#variable-types)
 * [Composite Types](#composite-types)
@@ -28,8 +22,23 @@ To get started, you may download the latest version from [here](https://github.c
    * [For](#for)
    * [Scan](#scan)  
    * [Break and Continue](#break-continue)
+* [Classes](#classes)
+   * [Defining Classes](#defining-classes)
+   * [Properties](#properties)
+   * [Methods](#methods)
+   * [Inheritance](#inheritance)
+* [Comments](#comments)
+* [Concurrency](#concurrency)
+   * [Threads](#threads)
+   * [Thread Communication](#thread-communication)
+* [Modules](#modules)   
 
 # Quick Introduction
+Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP so that the tight integration between both produces a seamless experience that adds power to Data Science and Data Analytics. 
+
+Unlike other scripting languages, Coyote makes you declare your variables and provides the security that comes from compile-time type checking. At the same time, it offers extensive data manipulation structures that can be combined as needed. Multi-dimensional arrays can contain classes and functions, functions can be stored in Data Frames, and all objects can be passed as parameters to functions or methods.
+
+To get started, you may download the latest version from [here](https://github.com/cseidman/Coyote/releases) 
 
 ### Variable Types
 | Type | Description  |
@@ -415,4 +424,29 @@ while x < 5 {
 // 4
 // 5
 ```
- 
+## Classes
+A class is a user-defined blueprint or prototype from which objects are created. Classes provide a means of bundling data and functionality together. Creating a new class creates a new type of object, allowing new instances of that type to be made. Each class instance can have attributes attached to it for maintaining its state. Class instances can also have methods (defined by its class) for modifying its state.
+```
+var myClass = class {
+    int a
+    int b
+    sum(x:int y:int) int {
+        return x+y+this.a+this.b
+    }
+
+}
+
+var x = new myClass
+x.a = 6
+x.b = 4
+
+println(x.sum(3,4))
+// 17
+
+var y = new myClass
+y.a = 10
+y.b = 20
+
+println(y.sum(3,4))
+// 37
+```
