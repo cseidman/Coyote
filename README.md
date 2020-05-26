@@ -36,7 +36,7 @@
    * [Creating Tables](#creating-tables)
    * [Insering Data](#inserting data)
    * [SQL Queries](#sql-queries)
-* File IO(#file-io)
+* [File IO](#file-io)
    * [Reading Files](#reading-files)
    * [Writing Files](#reading-files)
    * [Delimited Files](#delmited-files)
