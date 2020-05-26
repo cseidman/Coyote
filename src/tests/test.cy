@@ -1,14 +1,13 @@
-var myClass = class {
-    int a
-    int b
-    sum(x:int y:int) int {
-        return x+y+this.a+this.b
-    }
+create table Person (
+    first_name string,
+    last_name string,
+    age int
+)
 
-}
+insert into Person (first_name, last_name, age) values ("John","Smith",28)
+insert into Person (first_name, last_name, age) values ("Mary","Jones",42)
+insert into Person (first_name, last_name, age) values ("George","Carlin",66)
+
+select first_name from Person
 
 
-var x = new myClass
-x.a = 10
-x.b = 20
-println(x.sum(3,4))

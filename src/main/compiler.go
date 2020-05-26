@@ -2289,13 +2289,27 @@ func (c *Compiler) InsertInto() {
 
 func (c *Compiler) SelectStatement() {
 
-	type SqlSelect struct {
-		//table
-	}
-
+	fldCount := int16(0)
 	if c.Match(TOKEN_STAR) || c.Match(TOKEN_ALL) {
 		// All columns
+	} else {
+		// Get the columns as named
+		for {
+			c.Consume(TOKEN_IDENTIFIER,"Expect field name")
+			fldCount++
+			c.EmitInstr(OP_PUSH,c.MakeConstant(ObjString(c.Parser.Previous.ToString())))
+			if !c.Match(TOKEN_COMMA) {
+				break
+			}
+		}
+		c.EmitInstr(OP_PUSH,fldCount)
 	}
+	if c.Match(TOKEN_FROM) {
+		c.Consume(TOKEN_IDENTIFIER,"Expect table name")
+		c.EmitInstr(OP_PUSH,c.MakeConstant(ObjString(c.Parser.Previous.ToString())))
+		c.EmitOp(OP_SQL_SELECT)
+	}
+
 }
 
 func (c *Compiler) Allocate() {

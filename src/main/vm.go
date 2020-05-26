@@ -902,18 +902,42 @@ func (v *VM) Dispatch(opCode byte) {
 		db := v.DataBases[v.CurrDb]
 		db.DropTable(tableName)
 
+	case OP_SQL_SELECT:
+
+		tableName :=  string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
+		df := v.DataBases[v.CurrDb].Tables[tableName]
+
+		fldCount := int(v.Pop().(ObjInteger)) // Number of fields coming
+
+		// Array that will hold the fields we're interested in
+		cols := make([]string,fldCount)
+		// Store the fields by name in the array
+		for i:=fldCount-1;i>=0;i-- {
+			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
+		}
+
+		fmt.Printf("Rows: %d Flds: %d\n",df.RowCount,fldCount)
+		for i:=int64(0);i<df.RowCount;i++ {
+			for c:=0;c<fldCount;c++ {
+				fmt.Println("Row")
+				fmt.Printf("%s\t",df.Columns[cols[c]].GetValue(i).ShowValue())
+			}
+			fmt.Println()
+		}
+
+
 	case OP_INSERT:
+
 
 		tableName := string(v.GetOperand().(ObjString))
 		valCount := v.GetOperandValue()
 
 		// Instance of the table
-		table := v.DataBases[v.CurrDb].Tables[tableName]
 		var cols []string
 		// If no columns were declared, we're going to get the column count from the
 		// table itself
 		if valCount == 0 {
-			cols = table.ColNames
+			cols = v.DataBases[v.CurrDb].Tables[tableName].ColNames
 			valCount = int16(len(cols))
 		} else {
 			cols = make([]string,valCount)
@@ -931,7 +955,7 @@ func (v *VM) Dispatch(opCode byte) {
 			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
 		}
 
-		table.AddRow(cols,vals)
+		(&v.DataBases[v.CurrDb].Tables[tableName]).AddRow(cols,vals)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

@@ -35,11 +35,11 @@ type Column struct {
 }
 
 func (c *Column) GetValue(row int64) Obj {
-	switch c.ValType {
-		case VAL_STRING:
+	//switch c.ValType {
+	//	case VAL_STRING:
 			return ObjString(string(c.StoragePtr[row]))
-	}
-	return nil
+	//}
+	//return NULL{}
 }
 
 type ObjDataFrame struct {
