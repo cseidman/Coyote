@@ -34,7 +34,7 @@
 * [Modules](#modules)   
 * [Coyote SQL](#coyote-sql)
    * [Creating Tables](#creating-tables)
-   * [Insering Data](#inserting data)
+   * [Inserting Data](#inserting data)
    * [SQL Queries](#sql-queries)
 * [File IO](#file-io)
    * [Reading Files](#reading-files)
