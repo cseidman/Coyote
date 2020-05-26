@@ -32,31 +32,6 @@ var BreakPtr int
 var StartLoop = make([]int, 255)
 var StartPtr int
 
-// We use this to assign a unique if to every scope defined in the application
-// so that we can know later on that variables declared in a given scope are different
-// to variables of the same name are indeed different despite being in the same depth
-var ScopeId = -1
-
-// Keeps track of the last expression's return value
-type ExpressionData struct {
-	Value   ValueType
-	ObjType VarType
-	Dimensions int // Relevant only for arrays and matrices
-}
-
-var ExpressionValue = make([]ExpressionData, 255)
-var ExpressionValueId int
-
-func PushExpressionValue(data ExpressionData) {
-	ExpressionValue[ExpressionValueId] = data
-
-	ExpressionValueId++
-}
-
-func PopExpressionValue() ExpressionData {
-	ExpressionValueId--
-	return ExpressionValue[ExpressionValueId]
-}
 
 // Utility
 func (c *Compiler) ClearCR() {
@@ -89,16 +64,6 @@ func PopLoop() byte {
 
 func PeekLoop() byte {
 	return LoopType[LoopPtr-1]
-}
-
-type PropertyVar struct {
-	EnclosingClass *ClassVar
-	Access         AccessorType
-	Name           string
-	Index          int16
-	DataType       ValueType
-	ObjType        VarType
-	HasValue       bool
 }
 
 func PushClass() *ClassVar {
@@ -158,44 +123,6 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 	}
 }
 
-// This is the global variable space
-type Global struct {
-	name          string
-	//datatype      ValueType
-	//objtype       VarType
-	IsInitialized bool
-	Class         *ClassVar
-	ExprData      ExpressionData
-}
-
-var GlobalVars = make([]Global, 65000)
-var GlobalCount = int16(0)
-
-type Local struct {
-	name          string
-	depth         int
-	isCaptured    bool
-	scopeId       int
-	IsInitialized bool
-	Class         *ClassVar
-	ExprData  ExpressionData
-
-}
-
-type Upvalue struct {
-	Index    int16
-	IsLocal  bool
-	ExprData  ExpressionData
-	Class    *ClassVar
-}
-
-var namedRegisters = make(map[string]int16)
-
-type register struct {
-	isUsed bool
-}
-
-var registers = make([]register, 256)
 
 type Compiler struct {
 	Current *FunctionVar
@@ -839,6 +766,13 @@ func (c *Compiler) GetDataType() ExpressionData {
 		c.Advance()
 		expd.Value = VAL_ENUM
 		expd.ObjType = VAR_ENUM
+	case c.Check(TOKEN_IDENTIFIER):
+		// This could be a user defined type such as a class
+		//tok := c.Parser.Current
+		//idx, expData, varScope := c.ResolveVariable(tok)
+		//if idx != -1 {
+		//	tt := ValueType(100)
+		//}
 
 	default:
 		{
@@ -1335,13 +1269,13 @@ func (c *Compiler) Binary(canAssign bool) {
 	}
 }
 
-func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ValueType {
+func (c *Compiler) FindPropertyType(class *ClassVar, propertyName string) ExpressionData {
 	for i := int16(0); i < class.PropertyCount; i++ {
 		if class.Properties[i].Name == propertyName {
-			return class.Properties[i].DataType
+			return class.Properties[i].ExprData
 		}
 	}
-	return VAL_NIL
+	return ExpressionData{VAL_NIL, VAR_UNKNOWN, 0}
 }
 
 func (c *Compiler) NewList(canAssign bool) {
@@ -1498,6 +1432,22 @@ func (c *Compiler) Index(canAssign bool) {
 	PushExpressionValue(expData)
 	c.Consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index reference")
 	c.EmitInstr(OP_AINDEX, int16(1))
+}
+
+// When evauating a compound object, one optimizaion is to pass the
+// reference to the parent objects witout having to emit an OP code
+// specifically to load it. Instead, the best thing is to keep a reference
+// to it handy until we arrive at the final propery/method/variable. At that point,
+// we'll simply "invoke" that variable along with the parent references all in one
+// VM cycle. The parent references then will get "shlved" here for future use
+type ShelvedRef struct {
+	ReferenceId int16
+	*VariableScope
+	*ExpressionData
+}
+var shelved = make([]ShelvedRef,64)
+func (c *Compiler) ShelveReference() {
+
 }
 
 func (c *Compiler) CompoundVariable(tok *Token) *ExpressionData {

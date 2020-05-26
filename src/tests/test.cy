@@ -7,16 +7,8 @@ var myClass = class {
 
 }
 
+
 var x = new myClass
-x.a = 6
-x.b = 4
-
+x.a = 10
+x.b = 20
 println(x.sum(3,4))
-// 17
-
-var y = new myClass
-y.a = 10
-y.b = 20
-
-println(y.sum(3,4))
-// 37

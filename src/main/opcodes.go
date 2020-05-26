@@ -142,6 +142,7 @@ const (
 	OP_HKEY
 	OP_MAKE_LIST
 	OP_OBJ_INSTANCE
+	OP_INVOKE
 )
 
 var OpLabel = map[byte]string{
@@ -299,5 +300,7 @@ var OpLabel = map[byte]string{
 	OP_HKEY:		 "OP_HKEY",
 	OP_MAKE_LIST:	 "OP_MAKE_LIST",
 	OP_OBJ_INSTANCE: "OBJ_INSTANCE",
+
+	OP_INVOKE:		 "OP_INVOKE",
 
 }

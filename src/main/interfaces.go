@@ -122,5 +122,23 @@ const (
 	LOCAL
 	UPVALUE
 	REGISTER
+	CLASS_PROPERTY
 )
+
+// This structure is going to get us to where we can
+// create user defined data types
+type VarInfo struct {
+	Id int
+	BaseType ValueType
+	IsNative bool
+}
+var VarData = map[string]VarInfo {
+	"int": {0,VAL_INTEGER,true},
+	"float": {1,VAL_FLOAT, true},
+	"bool": {2,VAL_BOOL, true },
+	"string": {3, VAL_STRING, true},
+	"byte":{4, VAL_BYTE, true },
+	"nil": {5, VAL_NIL, true},
+}
+
 
