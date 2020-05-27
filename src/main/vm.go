@@ -39,6 +39,8 @@ func (d *Database) AddTable(df *ObjDataFrame) int {
 	}
 	d.Tables[d.TableCount] = df
 	d.TableCount++
+	// Add this to the data dictionary
+	d.UpdateDictionary()
 	return d.TableCount-1
 }
 

@@ -19,10 +19,9 @@ type DBCol struct {
 type DataDict struct {
 	DBId int64 // Database id
 	DBName string // Database name
-
-
 	DBObjCount int
-
+	Tables []ObjDataFrame
+	Columns []ObjDataFrame
 }
 
 type Column struct {
@@ -35,11 +34,16 @@ type Column struct {
 }
 
 func (c *Column) GetValue(row int64) Obj {
-	//switch c.ValType {
-	//	case VAL_STRING:
+	switch c.ValType {
+		case VAL_STRING:
 			return ObjString(string(c.StoragePtr[row]))
-	//}
-	//return NULL{}
+		case VAL_INTEGER:
+			return ObjInteger(BytesToInt64(c.StoragePtr[row]))
+		case  VAL_FLOAT:
+			return ObjInteger(BytesToFloat64(c.StoragePtr[row]))
+		default:
+			return NULL{}
+	}
 }
 
 type ObjDataFrame struct {
@@ -78,13 +82,14 @@ type DataStorage []byte
 func CreateTable(name string) ObjDataFrame {
 	// Start off by creating a barebones table with the expectation that we're
 	// going to add columns later
-	return ObjDataFrame{
+	df := ObjDataFrame{
 		Name:        name,
 		Columns:     make(map[string]*Column),
 		ColumnCount: 0,
 		Defined:     false, // Is the table finished being deined?
 		ColNames:    make([]string,0),
 	}
+	return df
 }
 
 func (o *ObjDataFrame) AddColumn(name string, valType ValueType) {
