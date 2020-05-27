@@ -2226,7 +2226,7 @@ func (c *Compiler) CreateTable() {
 	}
 	c.Consume(TOKEN_RIGHT_PAREN,"Expect ')' after complete 'CREATE TABLE' statement")
 
-	idx := c.MakeConstant(tbl)
+	idx := c.MakeConstant(&tbl)
 
 	c.EmitInstr(OP_CREATE_TABLE,idx)
 

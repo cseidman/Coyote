@@ -17,22 +17,38 @@ type CallFrame struct {
 
 type Database struct {
 	Name string
-	Tables map[string]ObjDataFrame
+	Tables []*ObjDataFrame
 	TableCount int
 }
 
-func (d *Database) AddTable(df ObjDataFrame) {
-	d.Tables[df.Name] = df
+func (d *Database) GetTable(tableName string) *ObjDataFrame {
+	for i:=0;i<d.TableCount;i++ {
+		if d.Tables[i].Name == tableName {
+			return d.Tables[i]
+		}
+	}
+	return nil
+}
+
+func (d *Database) AddTable(df *ObjDataFrame) int {
+	for i:=0;i<d.TableCount;i++ {
+		if d.Tables[i].Name == df.Name {
+			fmt.Printf("Table %s already exists\n",df.Name)
+			return -1
+		}
+	}
+	d.Tables[d.TableCount] = df
 	d.TableCount++
+	return d.TableCount-1
 }
 
 func (d *Database) DropTable(dfName string) {
-	delete(d.Tables, dfName)
-	d.TableCount--
+	//delete(d.Tables, dfName)
+	//d.TableCount--
 }
 
 type VM struct {
-	DataBases map[string]Database
+	DataBases []Database
 	Frames []CallFrame
 	Code   []byte
 	fp     int
@@ -45,7 +61,7 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	CurrDb string // Current Database
+	CurrDb *Database // Current Database
 
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
@@ -237,19 +253,19 @@ func Exec(source *string, dbgMode bool) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
-		DataBases: make(map[string]Database),
+		DataBases: make([]Database,64),
 		DebugMode: dbgMode,
 	}
 	fn := Compile(source, dbgMode)
 
 	// Create a default database
-	vm.DataBases["main"] = Database{
+	vm.DataBases[0] = Database{
 		Name:       "main",
-		Tables:     make(map[string]ObjDataFrame),
+		Tables:     make([]*ObjDataFrame,1024),
 		TableCount: 0,
 	}
 
-	vm.CurrDb = "main"
+	vm.CurrDb = &vm.DataBases[0]
 
 	if fn == nil {
 		fmt.Println("Syntax error")
@@ -893,51 +909,38 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(Range(startRange,endRange))
 
 	case OP_CREATE_TABLE:
-		df := v.GetOperand().(ObjDataFrame)
-		db := v.DataBases[v.CurrDb]
-		db.AddTable(df)
+		df := v.GetOperand().(*ObjDataFrame)
+		v.CurrDb.AddTable(df)
 
 	case OP_DROP_TABLE:
-		tableName := string(v.GetOperand().(ObjString))
-		db := v.DataBases[v.CurrDb]
-		db.DropTable(tableName)
+		//tableName := string(v.GetOperand().(ObjString))
+		//db := v.DataBases[v.CurrDb]
+		//db.DropTable(tableName)
 
 	case OP_SQL_SELECT:
 
-		tableName :=  string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
-		df := v.DataBases[v.CurrDb].Tables[tableName]
-
-		fldCount := int(v.Pop().(ObjInteger)) // Number of fields coming
-
-		// Array that will hold the fields we're interested in
-		cols := make([]string,fldCount)
-		// Store the fields by name in the array
-		for i:=fldCount-1;i>=0;i-- {
-			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
-		}
-
-		fmt.Printf("Rows: %d Flds: %d\n",df.RowCount,fldCount)
-		for i:=int64(0);i<df.RowCount;i++ {
-			for c:=0;c<fldCount;c++ {
-				fmt.Println("Row")
-				fmt.Printf("%s\t",df.Columns[cols[c]].GetValue(i).ShowValue())
-			}
-			fmt.Println()
-		}
-
+		// Because of the amount of code required to perform a SQL query we
+		// put this in a separate file altogether
+		v.RunSqlQuery()
 
 	case OP_INSERT:
 
-
 		tableName := string(v.GetOperand().(ObjString))
 		valCount := v.GetOperandValue()
+
+		df := v.CurrDb.GetTable(tableName)
+
+		if df == nil {
+			fmt.Printf("Table %s not found in database %s\n",tableName, v.CurrDb.Name)
+			panic("Error")
+		}
 
 		// Instance of the table
 		var cols []string
 		// If no columns were declared, we're going to get the column count from the
 		// table itself
 		if valCount == 0 {
-			cols = v.DataBases[v.CurrDb].Tables[tableName].ColNames
+			cols = df.ColNames
 			valCount = int16(len(cols))
 		} else {
 			cols = make([]string,valCount)
@@ -950,12 +953,11 @@ func (v *VM) Dispatch(opCode byte) {
 		}
 
 		// Get the list of columns
-
 		for i := valCount-1; i >= 0; i-- {
 			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
 		}
 
-		(&v.DataBases[v.CurrDb].Tables[tableName]).AddRow(cols,vals)
+		df.AddRow(cols,vals)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
