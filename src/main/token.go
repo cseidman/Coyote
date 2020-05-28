@@ -133,6 +133,9 @@ const (
 	TOKEN_LIST_TYPE
 	TOKEN_INDEX
 	TOKEN_NEW
+	TOKEN_SQL_UNIQUE
+	TOKEN_NOT
+	TOKEN_NULL
 )
 
 type TokenProperties struct {
@@ -252,6 +255,9 @@ var TokenLabels = map[string]TokenProperties{
 	"list": {TOKEN_LIST_TYPE, true},
 	"index": {TOKEN_INDEX, false},
 	"new": {TOKEN_NEW, true},
+	"unique": {TOKEN_SQL_UNIQUE, false},
+	"not": {TOKEN_NOT, false},
+	"null": {TOKEN_NULL, false},
 }
 
 type Precedence byte

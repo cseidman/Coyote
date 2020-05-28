@@ -141,4 +141,22 @@ var VarData = map[string]VarInfo {
 	"nil": {5, VAL_NIL, true},
 }
 
+type SQLDataType byte
+const (
+	SQL_INT SQLDataType = iota
+	SQL_NUMERIC
+	SQL_REAL
+	SQL_TEXT
+	SQL_BLOB
+)
+
+func GetSQLType(valType ValueType) SQLDataType {
+	switch valType {
+	case VAL_STRING:	return SQL_TEXT
+	case VAL_INTEGER, VAL_BYTE:   return SQL_INT
+	case VAL_FLOAT: 	return SQL_REAL
+	case VAL_BOOL:		return SQL_NUMERIC
+	default :			return SQL_BLOB
+	}
+}
 

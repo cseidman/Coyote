@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"runtime/debug"
+	"database/sql"
 )
 
 type CallFrame struct {
@@ -15,45 +16,12 @@ type CallFrame struct {
 	slotptr int
 }
 
-type Database struct {
-	Name string
-	Tables []*ObjDataFrame
-	TableCount int
-}
-
-func (d *Database) GetTable(tableName string) *ObjDataFrame {
-	for i:=0;i<d.TableCount;i++ {
-		if d.Tables[i].Name == tableName {
-			return d.Tables[i]
-		}
-	}
-	return nil
-}
-
-func (d *Database) AddTable(df *ObjDataFrame) int {
-	for i:=0;i<d.TableCount;i++ {
-		if d.Tables[i].Name == df.Name {
-			fmt.Printf("Table %s already exists\n",df.Name)
-			return -1
-		}
-	}
-	d.Tables[d.TableCount] = df
-	d.TableCount++
-	// Add this to the data dictionary
-	d.UpdateDictionary()
-	return d.TableCount-1
-}
-
-func (d *Database) DropTable(dfName string) {
-	//delete(d.Tables, dfName)
-	//d.TableCount--
-}
-
 type VM struct {
-	DataBases []Database
 	Frames []CallFrame
 	Code   []byte
 	fp     int
+
+	db     *sql.DB
 
 	Frame *CallFrame
 
@@ -63,7 +31,7 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	CurrDb *Database // Current Database
+	//CurrDb *Database // Current Database
 
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
@@ -255,19 +223,12 @@ func Exec(source *string, dbgMode bool) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
-		DataBases: make([]Database,64),
+
+		db: OpenDb()	,
+
 		DebugMode: dbgMode,
 	}
 	fn := Compile(source, dbgMode)
-
-	// Create a default database
-	vm.DataBases[0] = Database{
-		Name:       "main",
-		Tables:     make([]*ObjDataFrame,1024),
-		TableCount: 0,
-	}
-
-	vm.CurrDb = &vm.DataBases[0]
 
 	if fn == nil {
 		fmt.Println("Syntax error")
@@ -911,8 +872,8 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(Range(startRange,endRange))
 
 	case OP_CREATE_TABLE:
-		df := v.GetOperand().(*ObjDataFrame)
-		v.CurrDb.AddTable(df)
+		sql := string(v.GetOperand().(ObjString))
+		v.db.Exec(sql)
 
 	case OP_DROP_TABLE:
 		//tableName := string(v.GetOperand().(ObjString))
@@ -926,11 +887,9 @@ func (v *VM) Dispatch(opCode byte) {
 		v.RunSqlQuery()
 
 	case OP_INSERT:
-
+/*
 		tableName := string(v.GetOperand().(ObjString))
 		valCount := v.GetOperandValue()
-
-		df := v.CurrDb.GetTable(tableName)
 
 		if df == nil {
 			fmt.Printf("Table %s not found in database %s\n",tableName, v.CurrDb.Name)
@@ -960,7 +919,7 @@ func (v *VM) Dispatch(opCode byte) {
 		}
 
 		df.AddRow(cols,vals)
-
+*/
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
 		return

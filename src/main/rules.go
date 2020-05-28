@@ -127,6 +127,7 @@ func (c *Compiler) LoadRules() {
 		{c.NewList, nil, nil, PREC_NONE}, // TOKEN_LIST_TYPE
 		{nil, nil, nil, PREC_NONE}, // TOKEN_INDEX
 		{c.New, nil, nil, PREC_NONE}, // TOKEN_NEW
+		{nil, nil, nil, PREC_NONE}, // TOKEN_SQL_UNIQUE
 	}
 }
 func (c *Compiler) GetRule(t_type TokenType) *ParseRule {

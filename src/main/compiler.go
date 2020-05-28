@@ -2200,37 +2200,72 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 }
 
-func (c *Compiler) CreateTable() {
-	c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'CREATE TABLE'")
-	tblName := c.Parser.Previous.ToString()
-	c.ClearCR()
 
-	tbl := CreateTable(tblName)
+func (c *Compiler) CreateTable() {
+
+	sqlCmd := "\nCREATE TABLE "
+
+	c.Consume(TOKEN_IDENTIFIER,"Expect table or schema name after 'CREATE TABLE'")
+	// Mean we've specified a schema name
+	name := c.Parser.Previous.ToString()
+	schemaName := ""
+	if c.Match(TOKEN_DOT) {
+		schemaName = name
+		sqlCmd += fmt.Sprintf("%s.",schemaName)
+		c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'CREATE TABLE schema'")
+		name = c.Parser.Previous.ToString()
+	}
+	tblName := name
+	sqlCmd += fmt.Sprintf("%s\n",tblName)
 
 	c.Consume(TOKEN_LEFT_PAREN,"Expect '(' after 'CREATE TABLE' statement")
-	c.ClearCR()
+	sqlCmd += "(\n"
 	for {
 		// Column name
 		c.Consume(TOKEN_IDENTIFIER,"Expect column name")
 		colName := c.Parser.Previous.ToString()
-
+		sqlCmd += "  " + colName + " "
 		// Column type
-		dType := c.GetDataType()
+		sqlType := GetSQLType(c.GetDataType().Value)
+		sqlTypeText := ""
+		switch sqlType {
+			case SQL_INT: sqlTypeText = "INTEGER"
+			case SQL_NUMERIC: sqlTypeText = "NUMERIC"
+			case SQL_REAL: sqlTypeText = "REAL"
+			case SQL_TEXT: sqlTypeText = "TEXT"
+			default : sqlTypeText = "BLOB"
+		}
 
-		tbl.AddColumn(colName, dType.Value)
+		sqlCmd += sqlTypeText + " "
 
-		c.ClearCR()
+		for {
+			if c.Match(TOKEN_SQL_UNIQUE) {
+				sqlCmd += "UNIQUE "
+				continue
+			}
+
+			if c.Match(TOKEN_NOT) && c.Match(TOKEN_NULL) {
+				sqlCmd += "NOT NULL "
+				continue
+			}
+			break
+		}
 		if !c.Match(TOKEN_COMMA) {
 			break
 		}
+		sqlCmd += ",\n"
+
 	}
 	c.Consume(TOKEN_RIGHT_PAREN,"Expect ')' after complete 'CREATE TABLE' statement")
+	sqlCmd += "\n)\n"
+	idx := c.MakeConstant(ObjString(sqlCmd))
 
-	idx := c.MakeConstant(&tbl)
+	fmt.Println(sqlCmd)
 
 	c.EmitInstr(OP_CREATE_TABLE,idx)
 
 }
+
 
 func (c *Compiler) CreateStatement() {
 	switch {
@@ -2246,31 +2281,37 @@ func (c *Compiler) InsertStatement() {
 }
 
 func (c *Compiler) InsertInto() {
+	sqlCmd := "INSERT INTO "
 	c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'INSERT INTO'")
-	tblName := c.Parser.Previous.ToString()
-	tblIdx := c.MakeConstant(ObjString(tblName))
+	name := c.Parser.Previous.ToString()
 
-	colCount := 0
+	if c.Match(TOKEN_DOT) {
+		sqlCmd += name + "."
+		c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'INSERT INTO' schema")
+		sqlCmd += c.Parser.Previous.ToString()
+	} else {
+		sqlCmd += name
+	}
 
 	if c.Match(TOKEN_LEFT_PAREN) {
+		sqlCmd += "\n(\n"
 		// We need to specify which columns
 		for {
 			c.Consume(TOKEN_IDENTIFIER,"Expect column names")
 			colName := c.Parser.Previous.ToString()
-			c.EmitInstr(OP_PUSH, c.MakeConstant(ObjString(colName)))
+
 			colCount++
 			if !c.Match(TOKEN_COMMA) {
 				break
 			}
 		}
 		c.Consume(TOKEN_RIGHT_PAREN, "Expect ') after column list'")
-	} else {
-		colCount = 0
-		// We use all columns
+		sqlCmd += "\n)\n"
 	}
 
 	valCount := 0
 	if c.Match(TOKEN_VALUES) {
+		sqlCmd += "VALUES "
 		c.Consume(TOKEN_LEFT_PAREN,"Expect '(' after 'VALUES'")
 		for {
 			c.Expression()
