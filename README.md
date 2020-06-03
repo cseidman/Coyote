@@ -466,14 +466,30 @@ Coyote bundles together tools for organizing dataframes, querying data, and deve
 The key, distinctive feature of Coyote's SQL engine is that it's fully integrated into the language. That means that there is no connection to establish locally, and no translation of column data types into naive data types since they're one and the same. Simply write your SQL in the application as you would any other command or expression.
   
 ### Creating Tables
+You can use standard SQL syntax to create tables. All data types which ara available in Coyote can be used as data types for the columns  
 ```
 create table Person 
 (
     first_name string,
     last_name string,
     age int
-)
+);
 ```
+You can also create tables as a result of a query. This creates and populates a table based on the results of a SELECT statement. The table has the same number of columns as the rows returned by the query. The name and type of each column is the same as the name of the corresponding column in the result set of the SELECT statement:
+```
+create table Person2 as select * from Person where age < 50;
+```
+The DEFAULT clause assignes a default value to a column when no value is provided by the user when doing an INSERT. If there is no explicit DEFAULT clause attached to a column definition, then the default value of the column is NULL
+```
+create table Companies 
+(
+    CompanyName string NOT NULL
+    Address1 string
+    Address2 string
+    NumberOfOfficers int DEFAULT (0)     
+);
+```
+
 ### Inserting Data
 ```
 insert into Person (first_name, last_name, age) values ("John","Smith",28)
