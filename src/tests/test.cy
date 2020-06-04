@@ -17,7 +17,10 @@ showdata(df)
 create table Person2 as select * from Person where age <50;
 select * from Person2;
 
-opendb("northwind","c:/data/sqlitedata/northwind.db")
+opendb("northwind","../data/northwind.db")
 
-select OrderID, ProductID, (UnitPrice*Quantity)-(UnitPrice*Quantity*Discount) as ProductTotal
-FROM OrderDetail limit 10;
+//
+select
+a.OrderID, a.ProductID, b.ProductName, b.JJ, (a.UnitPrice*a.Quantity)-(a.UnitPrice*a.Quantity*a.Discount) as ProductTotal
+FROM OrderDetail a join Product b on a.ProductId = b.Id
+limit 10;

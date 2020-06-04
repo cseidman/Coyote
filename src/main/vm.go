@@ -889,19 +889,22 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_SQL_SELECT:
 		sqlCmd := string(v.GetOperand().(ObjString))
-		rows,_ := v.db.Query(sqlCmd)
+		rows,err := v.db.Query(sqlCmd)
+		if err != nil {
+			fmt.Println("Query error: " + err.Error())
+		} else {
 
-		df := new(ObjDataFrame)
-		df.Name = "df"
+			df := new(ObjDataFrame)
+			df.Name = "df"
 
-		// Grab the column types
-		df.Rows = rows
-		df.Columns,_ = rows.ColumnTypes()
-		df.ColNames,_ = rows.Columns()
-		df.ColumnCount = int16(len(df.Columns))
+			// Grab the column types
+			df.Rows = rows
+			df.Columns, _ = rows.ColumnTypes()
+			df.ColNames, _ = rows.Columns()
+			df.ColumnCount = int16(len(df.Columns))
 
-		v.Push(df)
-
+			v.Push(df)
+		}
 	case OP_INSERT:
 
 		vars := int(v.Pop().(ObjInteger))
