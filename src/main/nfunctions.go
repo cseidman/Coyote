@@ -20,6 +20,10 @@ func RegisterFunctions() {
 	RegisterNative("transpose", Transpose, ExpressionData{VAL_MATRIX, VAR_MATRIX,0}, true)
 	// Stats - Distribution
 	RegisterNative("dnorm", dnorm, ExpressionData{VAL_FLOAT, VAR_ARRAY,0}, true)
+	// Dataframe and database
+	RegisterNative("showdata", DfBrowse, ExpressionData{VAL_NIL, VAR_SCALAR,0}, false)
+	RegisterNative("opendb", OpenDatabase, ExpressionData{VAL_NIL, VAR_SCALAR,0}, false)
+	RegisterNative("use", UseDatabase, ExpressionData{VAL_NIL, VAR_SCALAR,0}, false)
 }
 
 func ResolveNativeFunction(name string) *ObjNative {

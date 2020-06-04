@@ -124,6 +124,8 @@ func (s *Scanner) ScanToken() Token {
 	case '<':
 		if s.Match('=') {
 			return s.MakeToken(TOKEN_LESS_EQUAL)
+		} else if s.Match('%'){
+			return s.MakeToken(TOKEN_BEGIN_VAR)
 		} else {
 			return s.MakeToken(TOKEN_LESS)
 		}
@@ -133,9 +135,18 @@ func (s *Scanner) ScanToken() Token {
 		} else {
 			return s.MakeToken(TOKEN_GREATER)
 		}
+	case '%':
+		if s.Match('>') {
+			return s.MakeToken(TOKEN_END_VAR)
+		} else {
+			return s.MakeToken(TOKEN_PERCENT)
+		}
 	// -- Literals
 	case '"':
 		return s.String()
+
+	case '\'':
+		return s.String2()
 
 	default:
 		log.Panicf("Unrecognized character byte:%d char: %#U", b, b)
@@ -194,6 +205,21 @@ func (s *Scanner) Number() Token {
 	return s.MakeToken(thisToken)
 }
 
+// Same as the other string but with single quote delimiters
+func (s *Scanner) String2() Token {
+	for s.Peek() != '\'' && !s.isAtEnd() {
+		if s.Peek() == '\n' {
+			s.Line++
+		}
+		s.Advance()
+	}
+	if s.isAtEnd() {
+		return s.ErrorToken("Unterminated string")
+	}
+	s.Advance()
+	return s.MakeToken(TOKEN_STRING2)
+}
+
 func (s *Scanner) String() Token {
 	for s.Peek() != '"' && !s.isAtEnd() {
 		if s.Peek() == '\n' {
@@ -247,7 +273,11 @@ func (s *Scanner) ErrorToken(message string) Token {
 }
 
 func (s *Scanner) IsTokenCaseInsensitive(tokenString string) bool {
-	return TokenLabels[tokenString].IsCaseSensitive
+	if s.SQLMode {
+		return SqlTokenLabels[tokenString].IsCaseSensitive
+	} else {
+		return TokenLabels[tokenString].IsCaseSensitive
+	}
 }
 
 func (s *Scanner) IdentifierType() TokenType {
@@ -256,16 +286,25 @@ func (s *Scanner) IdentifierType() TokenType {
 	// This is what we use to see if this keyword is case insensitive
 	testString := strings.ToLower(tokenString)
 	// Check to see if this allows mixed case
-	if s.IsTokenCaseInsensitive(testString) {
+	if !s.IsTokenCaseInsensitive(testString) {
 		// If so, then change it to lowercase to match the token list
 		tokenString = testString
 	}
 	// Does this value exist as a keyword? If so, return it
-	if val, ok := TokenLabels[tokenString]; ok {
-		return val.Type
+
+	// If we're evaluating a SQL Statement
+	if s.SQLMode {
+		if val, ok := SqlTokenLabels[tokenString]; ok {
+			return val.Type
+		} else if val, ok := TokenLabels[tokenString]; ok {
+			return val.Type
+		}
 	} else {
-		return TOKEN_IDENTIFIER
+		if val, ok := TokenLabels[tokenString]; ok {
+			return val.Type
+		}
 	}
+	return TOKEN_IDENTIFIER
 
 }
 

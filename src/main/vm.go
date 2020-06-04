@@ -6,6 +6,7 @@ import (
 	"math"
 	"runtime/debug"
 	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type CallFrame struct {
@@ -21,7 +22,8 @@ type VM struct {
 	Code   []byte
 	fp     int
 
-	db     *sql.DB
+	DbList map[string]*sql.DB // List of databases
+	db     *sql.DB // Current Database
 
 	Frame *CallFrame
 
@@ -31,11 +33,12 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	//CurrDb *Database // Current Database
-
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
 	ObjRegister      []Obj
+
+	DFRegister		 map[string]*ObjDataFrame
+
 	OpenUpvalues     *ObjUpvalue
 	DebugMode        bool
 }
@@ -149,7 +152,7 @@ func (v *VM) CallNative() {
 	argCount := int(v.GetOperandValue())
 	fn := *native.Function
 	result := fn(v, argCount, v.sp-argCount)
-	v.sp += argCount
+	//v.sp += argCount
 	if native.hasReturn {
 		v.Push(result)
 	}
@@ -185,7 +188,6 @@ func (v *VM) MethodCall() {
 		v.Frame.slots = v.Stack[start:]
 		v.Frame.slotptr = start //+ 1
 	}
-
 
 }
 
@@ -224,10 +226,15 @@ func Exec(source *string, dbgMode bool) {
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
 
-		db: OpenDb()	,
+		DFRegister: make(map[string]*ObjDataFrame),
+		DbList: make(map[string]*sql.DB),
 
 		DebugMode: dbgMode,
 	}
+	// Assigns the main - in memory db to the vm
+	vm.db = OpenDb(":memory:")
+	vm.DbList["main"] = vm.db
+
 	fn := Compile(source, dbgMode)
 
 	if fn == nil {
@@ -881,45 +888,40 @@ func (v *VM) Dispatch(opCode byte) {
 		//db.DropTable(tableName)
 
 	case OP_SQL_SELECT:
+		sqlCmd := string(v.GetOperand().(ObjString))
+		rows,_ := v.db.Query(sqlCmd)
 
-		// Because of the amount of code required to perform a SQL query we
-		// put this in a separate file altogether
-		v.RunSqlQuery()
+		df := new(ObjDataFrame)
+		df.Name = "df"
+
+		// Grab the column types
+		df.Rows = rows
+		df.Columns,_ = rows.ColumnTypes()
+		df.ColNames,_ = rows.Columns()
+		df.ColumnCount = int16(len(df.Columns))
+
+		v.Push(df)
 
 	case OP_INSERT:
-/*
-		tableName := string(v.GetOperand().(ObjString))
-		valCount := v.GetOperandValue()
 
-		if df == nil {
-			fmt.Printf("Table %s not found in database %s\n",tableName, v.CurrDb.Name)
-			panic("Error")
+		vars := int(v.Pop().(ObjInteger))
+		vals := make([]interface{},vars)
+
+		for i:=vars-1;i>=0;i-- {
+			vals[i] = v.Pop().ToValue()
 		}
 
-		// Instance of the table
-		var cols []string
-		// If no columns were declared, we're going to get the column count from the
-		// table itself
-		if valCount == 0 {
-			cols = df.ColNames
-			valCount = int16(len(cols))
-		} else {
-			cols = make([]string,valCount)
+		sql := string(v.GetOperand().(ObjString))
+		if vars > 0 {
+			sql = fmt.Sprintf(sql, vals...)
 		}
+		//fmt.Printf(sql)
+		v.db.Exec(sql)
 
-		vals := make([]Obj,valCount)
-		// Now get the values
-		for i := valCount-1; i >= 0; i-- {
-			vals[i] = v.Pop()
-		}
+	case OP_DISPLAY_TABLE:
+		df := v.Pop().(*ObjDataFrame)
+		df.PrintData(0)
 
-		// Get the list of columns
-		for i := valCount-1; i >= 0; i-- {
-			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
-		}
-
-		df.AddRow(cols,vals)
-*/
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
 		return

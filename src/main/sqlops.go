@@ -9,11 +9,9 @@ func (v *VM) ExecSQL(sql string) {
 
 }
 
-func OpenDb() *sql.DB {
-	db, _ := sql.Open("sqlite3", ":memory:")
+func OpenDb(dbPath string) *sql.DB {
+
+	db, _ := sql.Open("sqlite3", dbPath)
 	return db
 }
 
-func CreateDb() {
-	//OpenDb()
-}
