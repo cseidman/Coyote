@@ -1,5 +1,5 @@
 
-![alt text](https://github.com/cseidman/Coyote/blob/master/logo.jpg)
+![alt text](https://github.com/cseidman/Coyote/blob/master/cylogo.jpg)
 
 # Coyote
 * [Quick Introdution](#quick-introduction)
