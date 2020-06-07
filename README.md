@@ -1,6 +1,5 @@
 <img src="CoyoteLogoVer3.png" alt="drawing" width="400"/>
 
-# Coyote
 * [Quick Introdution](#quick-introduction)
 * [Variable Types](#variable-types)
 * [Composite Types](#composite-types)
