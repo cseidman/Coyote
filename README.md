@@ -1,6 +1,3 @@
-
-#![alt text](https://github.com/cseidman/Coyote/blob/master/CoyoteLogoVer1Web.jpg)
-#CoyoteLogoVer1.png
 <img src="CoyoteLogoVer1.png" alt="drawing" width="200"/>
 
 # Coyote
