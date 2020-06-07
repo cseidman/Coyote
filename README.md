@@ -1,4 +1,4 @@
-<img src="CoyoteLogoVer3.png" alt="drawing" width="300"/>
+<img src="CoyoteLogoVer3.png" alt="drawing" width="400"/>
 
 # Coyote
 * [Quick Introdution](#quick-introduction)
