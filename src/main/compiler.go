@@ -766,7 +766,7 @@ func (c *Compiler) GetDataType() ExpressionData {
 		c.Advance()
 		expd.Value = VAL_ENUM
 		expd.ObjType = VAR_ENUM
-	case c.Check(TOKEN_IDENTIFIER):
+	//case c.Check(TOKEN_IDENTIFIER):
 		// This could be a user defined type such as a class
 		//tok := c.Parser.Current
 		//idx, expData, varScope := c.ResolveVariable(tok)
@@ -1628,7 +1628,9 @@ func (c *Compiler) Boolean(canAssign bool) {
 	}
 	PushExpressionValue(ExpressionData{Value: VAL_BOOL, ObjType: VAR_SCALAR})
 }
-func (c *Compiler) SqlSelect(canAssign bool) {}
+func (c *Compiler) SqlSelect(canAssign bool) {
+	c.SelectStatement()
+}
 
 func (c *Compiler) Expression() {
 	c.ParsePrecedence(PREC_ASSIGNMENT)
@@ -2200,104 +2202,6 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 }
 
-func (c *Compiler) CreateTable() {
-	c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'CREATE TABLE'")
-	tblName := c.Parser.Previous.ToString()
-	c.ClearCR()
-
-	tbl := CreateTable(tblName)
-
-	c.Consume(TOKEN_LEFT_PAREN,"Expect '(' after 'CREATE TABLE' statement")
-	c.ClearCR()
-	for {
-		// Column name
-		c.Consume(TOKEN_IDENTIFIER,"Expect column name")
-		colName := c.Parser.Previous.ToString()
-
-		// Column type
-		dType := c.GetDataType()
-
-		tbl.AddColumn(colName, dType.Value)
-
-		c.ClearCR()
-		if !c.Match(TOKEN_COMMA) {
-			break
-		}
-	}
-	c.Consume(TOKEN_RIGHT_PAREN,"Expect ')' after complete 'CREATE TABLE' statement")
-
-	idx := c.MakeConstant(tbl)
-
-	c.EmitInstr(OP_CREATE_TABLE,idx)
-
-}
-
-func (c *Compiler) CreateStatement() {
-	switch {
-		case c.Match(TOKEN_TABLE) : c.CreateTable()
-		case c.Match(TOKEN_INDEX) :
-	}
-}
-
-func (c *Compiler) InsertStatement() {
-	switch {
-	case c.Match(TOKEN_INTO) : c.InsertInto()
-	}
-}
-
-func (c *Compiler) InsertInto() {
-	c.Consume(TOKEN_IDENTIFIER,"Expect table name after 'INSERT INTO'")
-	tblName := c.Parser.Previous.ToString()
-	tblIdx := c.MakeConstant(ObjString(tblName))
-
-	colCount := 0
-
-	if c.Match(TOKEN_LEFT_PAREN) {
-		// We need to specify which columns
-		for {
-			c.Consume(TOKEN_IDENTIFIER,"Expect column names")
-			colName := c.Parser.Previous.ToString()
-			c.EmitInstr(OP_PUSH, c.MakeConstant(ObjString(colName)))
-			colCount++
-			if !c.Match(TOKEN_COMMA) {
-				break
-			}
-		}
-		c.Consume(TOKEN_RIGHT_PAREN, "Expect ') after column list'")
-	} else {
-		colCount = 0
-		// We use all columns
-	}
-
-	valCount := 0
-	if c.Match(TOKEN_VALUES) {
-		c.Consume(TOKEN_LEFT_PAREN,"Expect '(' after 'VALUES'")
-		for {
-			c.Expression()
-			valCount++
-			if !c.Match(TOKEN_COMMA) {
-				break
-			}
-		}
-		c.Consume(TOKEN_RIGHT_PAREN, "Expect ') after values list'")
-	}
-	
-	c.EmitInstr(OP_INSERT, tblIdx)
-	c.EmitOperand(int16(colCount))
-
-}
-
-func (c *Compiler) SelectStatement() {
-
-	type SqlSelect struct {
-		//table
-	}
-
-	if c.Match(TOKEN_STAR) || c.Match(TOKEN_ALL) {
-		// All columns
-	}
-}
-
 func (c *Compiler) Allocate() {
 	c.New(true)
 }
@@ -2323,7 +2227,9 @@ func (c *Compiler) Statement() {
 		case c.Match(TOKEN_CR):
 		case c.Match(TOKEN_CREATE): 	c.CreateStatement()
 		case c.Match(TOKEN_INSERT): 	c.InsertStatement()
-		case c.Match(TOKEN_SELECT): 	c.SelectStatement()
+		case c.Match(TOKEN_SELECT):
+			c.SelectStatement()
+			c.EmitOp(OP_DISPLAY_TABLE)
 		default: c.ExpressionStatement()
 	}
 }

@@ -9,7 +9,7 @@ var ScopeId = -1
 type ExpressionData struct {
 	Value   ValueType
 	ObjType VarType
-	DataType string
+	//DataType string
 	Dimensions int // Relevant only for arrays and matrices
 }
 

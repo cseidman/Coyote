@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"runtime/debug"
+	"database/sql"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type CallFrame struct {
@@ -15,27 +17,13 @@ type CallFrame struct {
 	slotptr int
 }
 
-type Database struct {
-	Name string
-	Tables map[string]ObjDataFrame
-	TableCount int
-}
-
-func (d *Database) AddTable(df ObjDataFrame) {
-	d.Tables[df.Name] = df
-	d.TableCount++
-}
-
-func (d *Database) DropTable(dfName string) {
-	delete(d.Tables, dfName)
-	d.TableCount--
-}
-
 type VM struct {
-	DataBases map[string]Database
 	Frames []CallFrame
 	Code   []byte
 	fp     int
+
+	DbList map[string]*sql.DB // List of databases
+	db     *sql.DB // Current Database
 
 	Frame *CallFrame
 
@@ -45,11 +33,12 @@ type VM struct {
 	sp     int
 	prevSp int
 
-	CurrDb string // Current Database
-
 	FunctionRegister map[string]*ObjNative
 	Registers        []int64
 	ObjRegister      []Obj
+
+	DFRegister		 map[string]*ObjDataFrame
+
 	OpenUpvalues     *ObjUpvalue
 	DebugMode        bool
 }
@@ -163,7 +152,7 @@ func (v *VM) CallNative() {
 	argCount := int(v.GetOperandValue())
 	fn := *native.Function
 	result := fn(v, argCount, v.sp-argCount)
-	v.sp += argCount
+	//v.sp += argCount
 	if native.hasReturn {
 		v.Push(result)
 	}
@@ -199,7 +188,6 @@ func (v *VM) MethodCall() {
 		v.Frame.slots = v.Stack[start:]
 		v.Frame.slotptr = start //+ 1
 	}
-
 
 }
 
@@ -237,19 +225,17 @@ func Exec(source *string, dbgMode bool) {
 		Globals:   make([]Obj, 1024),
 		Registers: make([]int64, 256),
 		Frames:    make([]CallFrame, 1024),
-		DataBases: make(map[string]Database),
+
+		DFRegister: make(map[string]*ObjDataFrame),
+		DbList: make(map[string]*sql.DB),
+
 		DebugMode: dbgMode,
 	}
+	// Assigns the main - in memory db to the vm
+	vm.db = OpenDb(":memory:")
+	vm.DbList["main"] = vm.db
+
 	fn := Compile(source, dbgMode)
-
-	// Create a default database
-	vm.DataBases["main"] = Database{
-		Name:       "main",
-		Tables:     make(map[string]ObjDataFrame),
-		TableCount: 0,
-	}
-
-	vm.CurrDb = "main"
 
 	if fn == nil {
 		fmt.Println("Syntax error")
@@ -893,45 +879,51 @@ func (v *VM) Dispatch(opCode byte) {
 		v.Push(Range(startRange,endRange))
 
 	case OP_CREATE_TABLE:
-		df := v.GetOperand().(ObjDataFrame)
-		db := v.DataBases[v.CurrDb]
-		db.AddTable(df)
+		sql := string(v.GetOperand().(ObjString))
+		v.db.Exec(sql)
 
 	case OP_DROP_TABLE:
-		tableName := string(v.GetOperand().(ObjString))
-		db := v.DataBases[v.CurrDb]
-		db.DropTable(tableName)
+		//tableName := string(v.GetOperand().(ObjString))
+		//db := v.DataBases[v.CurrDb]
+		//db.DropTable(tableName)
 
+	case OP_SQL_SELECT:
+		sqlCmd := string(v.GetOperand().(ObjString))
+		rows,err := v.db.Query(sqlCmd)
+		if err != nil {
+			fmt.Println("Query error: " + err.Error())
+		} else {
+
+			df := new(ObjDataFrame)
+			df.Name = "df"
+
+			// Grab the column types
+			df.Rows = rows
+			df.Columns, _ = rows.ColumnTypes()
+			df.ColNames, _ = rows.Columns()
+			df.ColumnCount = int16(len(df.Columns))
+
+			v.Push(df)
+		}
 	case OP_INSERT:
 
-		tableName := string(v.GetOperand().(ObjString))
-		valCount := v.GetOperandValue()
+		vars := int(v.Pop().(ObjInteger))
+		vals := make([]interface{},vars)
 
-		// Instance of the table
-		table := v.DataBases[v.CurrDb].Tables[tableName]
-		var cols []string
-		// If no columns were declared, we're going to get the column count from the
-		// table itself
-		if valCount == 0 {
-			cols = table.ColNames
-			valCount = int16(len(cols))
-		} else {
-			cols = make([]string,valCount)
+		for i:=vars-1;i>=0;i-- {
+			vals[i] = v.Pop().ToValue()
 		}
 
-		vals := make([]Obj,valCount)
-		// Now get the values
-		for i := valCount-1; i >= 0; i-- {
-			vals[i] = v.Pop()
+		sql := string(v.GetOperand().(ObjString))
+		if vars > 0 {
+			sql = fmt.Sprintf(sql, vals...)
 		}
+		//fmt.Printf(sql)
+		v.db.Exec(sql)
 
-		// Get the list of columns
-
-		for i := valCount-1; i >= 0; i-- {
-			cols[i] = string(v.ReadConstant(int16(v.Pop().(ObjInteger))).(ObjString))
-		}
-
-		table.AddRow(cols,vals)
+	case OP_DISPLAY_TABLE:
+		df := v.Pop().(*ObjDataFrame)
+		df.PrintData(0)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])

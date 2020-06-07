@@ -182,7 +182,8 @@ func (i *Instructions) Display() {
 
 	fmt.Printf("Constants: %d\n", i.ConstantsCount)
 	for c := int16(0); c < i.ConstantsCount; c++ {
-		fmt.Printf("\tIndex: %d Value: %s\n", c, i.Constants[c].ShowValue())
+		strVal := i.Constants[c].ShowValue() + "           "
+		fmt.Printf("\tIndex: %d Value: %s\n", c, strVal[0:10])
 	}
 
 	bcount := 0
