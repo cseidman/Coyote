@@ -888,7 +888,23 @@ func (v *VM) Dispatch(opCode byte) {
 		//db.DropTable(tableName)
 
 	case OP_SQL_SELECT:
+
+		vars := int(v.Pop().(ObjInteger))
+		vals := make([]interface{},vars)
+
+		for i:=vars-1;i>=0;i-- {
+			vObj := v.Pop()
+			val := vObj.ToValue()
+			if vObj.Type() == VAL_STRING {
+				val = fmt.Sprintf("'%s'",val)
+			}
+			vals[i] = val
+		}
+
 		sqlCmd := string(v.GetOperand().(ObjString))
+		if vars > 0 {
+			sqlCmd = fmt.Sprintf(sqlCmd, vals...)
+		}
 		rows,err := v.db.Query(sqlCmd)
 		if err != nil {
 			fmt.Println("Query error: " + err.Error())
