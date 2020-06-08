@@ -460,9 +460,9 @@ println(y.sum(3,4))
 // 37
 ```
 ## Coyote SQL
-Coyote bundles together tools for organizing dataframes, querying data, and developing analytical applications. Unlike a full-fledged RDBMS, the focus of the Coyote database system is to optimize data analysis, so while doesn't support transactions, rollbacks, logging, and many other features designed to support transactional application systems - it does support indexing, column compression, and presistence. It also supports a modified version of ANSI-SQL queries with extra features that allow you to store native Coyote data objects in columns and to use application variables inside of the SQL Query.
+Coyote bundles together tools for organizing dataframes, querying data, and developing analytical applications. The language embeds the SQLite engine which offers all the functionality of the database engine while supporting Coyote's syntactic enhancements to the SQL language. You can store native Coyote data objects in columns and to use application variables inside SQL statements directly.
 
-The key, distinctive feature of Coyote's SQL engine is that it's fully integrated into the language. That means that there is no connection to establish locally, and no translation of column data types into naive data types since they're one and the same. Simply write your SQL in the application as you would any other command or expression.
+The key, distinctive feature of Coyote's SQL engine is that it's fully integrated into the language. That means that there is no connection to establish locally, and no translation of column data types into naive data types since they're one and the same. Simply write your SQL in the application as you would any other command or expression. All SQL statements need to end with a ```;```
   
 ### Creating Tables
 You can use standard SQL syntax to create tables. All data types which ara available in Coyote can be used as data types for the columns  
@@ -499,4 +499,10 @@ insert into Person (first_name, last_name, age) values ("George","Carlin",66)
 ### SQL Queries
 ```
 select first_name, last_name, age from Person
+```
+
+### Combining Variables and SQL
+Any variable can be used in the place of any element of a SQL query by using a ```$``` in front of the variable:
+```SQL
+
 ```

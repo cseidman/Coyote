@@ -21,6 +21,9 @@ opendb("northwind","../data/northwind.db")
 
 //
 select
-a.OrderID, a.ProductID, b.ProductName, b.JJ, (a.UnitPrice*a.Quantity)-(a.UnitPrice*a.Quantity*a.Discount) as ProductTotal
+a.ProductID,
+b.ProductName,
+printf("%d",sum((a.UnitPrice*a.Quantity)-(a.UnitPrice*a.Quantity*a.Discount))) as ProductTotal
 FROM OrderDetail a join Product b on a.ProductId = b.Id
-limit 10;
+group by a.ProductID,
+         b.ProductName;
