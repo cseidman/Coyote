@@ -1,6 +1,5 @@
-<img src="CoyoteLogoVer1.png" alt="drawing" width="300"/>
+<img src="CoyoteLogoVer3.png" alt="drawing" width="400"/>
 
-# Coyote
 * [Quick Introdution](#quick-introduction)
 * [Variable Types](#variable-types)
 * [Composite Types](#composite-types)
@@ -43,7 +42,7 @@
 * [Networking](#networking)
    * [TCP Clients and Servers](#tcp-clients-and-servers)  
 # Quick Introduction
-Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP so that the tight integration between both produces a seamless experience that adds power to Data Science and Data Analytics. 
+Welcome to Coyote - a fast, lightweight language designed for data engineers in mind. It lets you use the best features of both Functional and Object-Oriented languages while having a full-feature embedded SQL engine. The philosophy of the Coyote language is to incorporate the power of a full-fledged language with built-in SQL databases and OLAP stores so that the tight integration between both produces a seamless experience that adds power to Data Science and Data Analytics. 
 
 Unlike other scripting languages, Coyote makes you declare your variables and provides the security that comes from compile-time type checking. At the same time, it offers extensive data manipulation structures that can be combined as needed. Multi-dimensional arrays can contain classes and functions, functions can be stored in Data Frames, and all objects can be passed as parameters to functions or methods.
 
