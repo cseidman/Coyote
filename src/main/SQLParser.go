@@ -21,12 +21,22 @@ func (c *Compiler) CreateTable() {
 
 func (c *Compiler) SelectStatement() {
 	SqlCmd = "SELECT "
+	varCount := int16(0)
 	for !c.Match(TOKEN_SEMICOLON) {
+		if c.Match(TOKEN_DOLLAR) {
+			varCount++
+			// Get the variable on to the stack
+			c.Advance()
+			//tok := c.Parser.Previous
+			c.NamedVariable(true)
+			SqlCmd += "%v"
+		}
 		c.Advance()
-		SqlCmd += c.Parser.Previous.ToString() + "\n"
+		SqlCmd += c.Parser.Previous.ToString() + " "
 	}
 	idx := c.MakeConstant(ObjString(SqlCmd))
 	//fmt.Println(SqlCmd)
+	c.EmitInstr(OP_PUSH, varCount)
 	c.EmitInstr(OP_SQL_SELECT,idx)
 	//c.EmitOp(OP_DISPLAY_TABLE)
 }
