@@ -138,6 +138,11 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 	}
 }
 
+type Module struct {
+	ParentModule *Module
+	Name string
+	IsUsed bool // Is it used anywhere?
+}
 
 type Compiler struct {
 	Current *FunctionVar
@@ -147,6 +152,12 @@ type Compiler struct {
 	registers  []register
 	ScopeDepth int
 	DebugMode  bool
+
+	MainModuleDefined bool
+
+	Modules []Module
+	ModuleCount int
+	CurrentModule *Module
 }
 
 func Compile(source *string, dbgMode bool) *ObjFunction {
@@ -194,10 +205,13 @@ func NewCompiler(parser *Parser) *Compiler {
 	compiler.Parser = parser
 	compiler.Init()
 	compiler.LoadRules()
+
 	return &compiler
 }
 
 func (c *Compiler) Init() {
+
+	c.Modules = make([]Module, 16556)
 
 	c.Current = &FunctionVar{
 		paramCount: 0,
@@ -2221,9 +2235,29 @@ func (c *Compiler) Allocate() {
 	c.New(true)
 }
 
+func (c *Compiler) RegisterModule(moduleName string) {
+	for i:=0;i<c.ModuleCount;i++ {
+		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name = c.CurrentModule.Name {
+
+		}
+	}
+}
+
+func (c *Compiler) DeclareModule() {
+
+	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'Module'")
+	moduleName := c.Parser.Previous.ToString()
+
+	// If the module has already been declared, then merge the rest of the code with it
+
+
+}
+
 func (c *Compiler) Statement() {
 
 	switch {
+		case c.Match(TOKEN_MODULE):		c.DeclareModule()
+		case c.Match(TOKEN_IMPORT):
 		case c.Match(TOKEN_VAR): 		c.DeclareVariable()
 		case c.Match(TOKEN_NEW):        c.Allocate()
 		case c.Match(TOKEN_IF):			c.IfStatement()
