@@ -298,6 +298,8 @@ const (
 	TOKEN_SQL_WINDOW
 	TOKEN_SQL_WITH
 	TOKEN_SQL_WITHOUT
+	TOKEN_MODULE
+	TOKEN_IMPORT
 )
 
 type TokenProperties struct {
@@ -421,6 +423,8 @@ var TokenLabels = map[string]TokenProperties{
 	"null":      {TOKEN_NULL, false},
 	"<%":      {TOKEN_BEGIN_VAR, false},
 	"%>":      {TOKEN_END_VAR, false},
+	"module":      {TOKEN_MODULE, true},
+	"import":      {TOKEN_IMPORT, true},
 }
 var SqlTokenLabels = map[string]TokenProperties{
 	// SQL Commnads
