@@ -142,6 +142,7 @@ type Module struct {
 	ParentModule *Module
 	Name string
 	IsUsed bool // Is it used anywhere?
+
 }
 
 type Compiler struct {
@@ -2236,11 +2237,24 @@ func (c *Compiler) Allocate() {
 }
 
 func (c *Compiler) RegisterModule(moduleName string) {
-	for i:=0;i<c.ModuleCount;i++ {
-		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name = c.CurrentModule.Name {
 
+	for i:=0;i<c.ModuleCount-1;i++ {
+		// We already have this module
+		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name == c.CurrentModule.Name {
+			c.CurrentModule = &c.Modules[i]
+			return
 		}
 	}
+
+	mod := Module{
+		ParentModule: c.CurrentModule,
+		Name:         moduleName,
+		IsUsed:       false,
+	}
+
+	c.Modules[c.ModuleCount] = mod
+	c.CurrentModule = &mod
+	c.ModuleCount++
 }
 
 func (c *Compiler) DeclareModule() {
@@ -2248,8 +2262,7 @@ func (c *Compiler) DeclareModule() {
 	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'Module'")
 	moduleName := c.Parser.Previous.ToString()
 
-	// If the module has already been declared, then merge the rest of the code with it
-
+	c.RegisterModule(moduleName)
 
 }
 
