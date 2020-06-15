@@ -141,8 +141,9 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 type Module struct {
 	ParentModule *Module
 	Name string
+	LoadedModules []*Module
+	ModuleCount int
 	IsUsed bool // Is it used anywhere?
-
 }
 
 type Compiler struct {
@@ -263,7 +264,6 @@ func (c *Compiler) MakeConstant(value Obj) int16 {
 				}
 			}
 		}
-
 	}
 
 	constant := c.AddConstant(value)
@@ -287,8 +287,21 @@ func (c *Compiler) Advance() {
 	c.Parser.Current = c.Parser.NextToken()
 }
 
+func (c *Compiler) ResolveModule(moduleName string) int {
+	// Checks to see if this module had been registered
+	for i:=0;i<c.ModuleCount-1;i++ {
+		// We already have this module
+		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name == c.CurrentModule.Name {
+			c.CurrentModule = &c.Modules[i]
+			return i
+		}
+	}
+	return -1
+}
+
 func (c *Compiler) ResolveGlobal(tok *Token) (int16, *ExpressionData) {
 	var i int16
+	// Check in the current module
 	for i = 0; i < GlobalCount; i++ {
 		if tok.ToString() == GlobalVars[i].name {
 			return i, &GlobalVars[i].ExprData
@@ -351,6 +364,7 @@ func (c *Compiler) AddLocal(name string) int16 {
 	c.Current.Locals[c.Current.LocalCount].depth = c.ScopeDepth
 	c.Current.Locals[c.Current.LocalCount].isCaptured = false
 	c.Current.Locals[c.Current.LocalCount].scopeId = ScopeId
+	c.Current.Locals[c.Current.LocalCount].Module = c.CurrentModule
 
 	c.Current.LocalCount++
 	return c.Current.LocalCount - 1
@@ -496,6 +510,11 @@ func (c *Compiler) ResolveVariable(tok Token) (int16, ExpressionData, VariableSc
 	var expData *ExpressionData
 	var vScope VariableScope
 	var ok bool
+
+	// Check if this isn't really a variable, but a reference to a module
+	if c.Match(TOKEN_DOUBLE_COLON) {
+		// An identifier followed by a double-colon
+	}
 
 	if idx, expData = c.ResolveLocal(c.Current, tok.ToString()); idx != -1 {
 		vScope = LOCAL
@@ -835,7 +854,6 @@ func (c *Compiler) MatchTypes( data1 ExpressionData, data2 ExpressionData) bool 
 }
 
 func (c *Compiler) DeclareGlobalVariable(varName string) {
-
 	index := c.AddGlobal(varName)
 	if c.Match(TOKEN_EQUAL) {
 		// This is the value we're going to assign
@@ -846,6 +864,7 @@ func (c *Compiler) DeclareGlobalVariable(varName string) {
 		c.WriteComment(fmt.Sprintf("Setting global variable %s at location %d",varName,index))
 	} else {
 		GlobalVars[index].ExprData = c.GetDataType()
+		GlobalVars[index].Module = c.CurrentModule
 	}
 
 }
@@ -872,7 +891,7 @@ func (c *Compiler) DeclareLocalVariable(varName string) {
 		// This is the value we're going to assign
 		c.Expression()
 		c.Current.Locals[index].ExprData = PopExpressionValue()
-
+		GlobalVars[index].Module = c.CurrentModule
 		c.EmitInstr(OP_SET_LOCAL, index)
 	} else {
 		c.Current.Locals[index].ExprData = c.GetDataType()
@@ -2238,12 +2257,10 @@ func (c *Compiler) Allocate() {
 
 func (c *Compiler) RegisterModule(moduleName string) {
 
-	for i:=0;i<c.ModuleCount-1;i++ {
-		// We already have this module
-		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name == c.CurrentModule.Name {
-			c.CurrentModule = &c.Modules[i]
-			return
-		}
+	idx := c.ResolveModule(moduleName)
+	// If we found an existing module
+	if idx > -1 {
+		return
 	}
 
 	mod := Module{
@@ -2258,11 +2275,32 @@ func (c *Compiler) RegisterModule(moduleName string) {
 }
 
 func (c *Compiler) DeclareModule() {
-
-	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'Module'")
+	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'module'")
 	moduleName := c.Parser.Previous.ToString()
 
 	c.RegisterModule(moduleName)
+}
+
+func (c *Compiler) ImportStatement() {
+	// import <modulename> [as <alias>]
+	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'import'")
+	moduleName := c.Parser.Previous.ToString()
+
+	// See if this module has already been imported
+	for i:=0;i<c.CurrentModule.ModuleCount;i++ {
+		if c.CurrentModule.LoadedModules[i].Name == moduleName {
+			// If so, then there's no point in importing it again
+			return
+		}
+	}
+
+	idx := c.ResolveModule(moduleName)
+	if idx == -1 {
+		c.Error(fmt.Sprintf("Module %s not found",moduleName))
+	}
+	c.CurrentModule.LoadedModules[c.CurrentModule.ModuleCount] = &c.Modules[idx]
+	c.EmitInstr(OP_IMPORT, int16(idx))
+	c.WriteComment(fmt.Sprintf("Import module %s",moduleName))
 
 }
 
@@ -2270,7 +2308,7 @@ func (c *Compiler) Statement() {
 
 	switch {
 		case c.Match(TOKEN_MODULE):		c.DeclareModule()
-		case c.Match(TOKEN_IMPORT):
+		case c.Match(TOKEN_IMPORT):		c.ImportStatement()
 		case c.Match(TOKEN_VAR): 		c.DeclareVariable()
 		case c.Match(TOKEN_NEW):        c.Allocate()
 		case c.Match(TOKEN_IF):			c.IfStatement()

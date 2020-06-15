@@ -158,6 +158,8 @@ const (
 	OP_MAKE_LIST
 	OP_OBJ_INSTANCE
 	OP_INVOKE
+	OP_IMPORT
+	// 130
 )
 
 var OpLabel = map[byte]string{
@@ -317,5 +319,6 @@ var OpLabel = map[byte]string{
 	OP_OBJ_INSTANCE: "OBJ_INSTANCE",
 
 	OP_INVOKE:		 "OP_INVOKE",
+	OP_IMPORT:		 "OP_IMPORT",
 
 }

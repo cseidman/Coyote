@@ -91,7 +91,11 @@ func (s *Scanner) ScanToken() Token {
 	case '^':
 		return s.MakeToken(TOKEN_HAT)
 	case ':':
-		return s.MakeToken(TOKEN_COLON)
+		if s.Match(':') {
+			return s.MakeToken(TOKEN_DOUBLE_COLON)
+		} else {
+			return s.MakeToken(TOKEN_COLON)
+		}
 	case '$':
 		return s.MakeToken(TOKEN_DOLLAR)
 	// -- Double tokens

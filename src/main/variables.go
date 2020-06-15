@@ -27,26 +27,10 @@ func PopExpressionValue() ExpressionData {
 	return ExpressionValue[ExpressionValueId]
 }
 
-
 type VarTable struct {
 	Symbol []Variable
 }
-/*
-func (v *VarTable) Resolve(varName string, fn *FunctionVar) Variable {
-	// Try for the lowest memory locations first and work our way up
-	// So first we go with the locals
 
-	for i := fn.LocalCount - 1; i >= 0; i-- {
-		if c.IdentifiersEqual(name, fn.Locals[i].name) {
-			if fn.Locals[i].depth == -1 {
-				c.Error("Cannot read local variable in its own initializer.")
-			}
-			return i, &fn.Locals[i].ExprData
-		}
-	}
-	return -1, nil
-}
-*/
 type Variable interface {
 	GetScopeType() VariableScope
 }
@@ -66,6 +50,7 @@ func (v *PropertyVar) GetScopeType() VariableScope {
 
 // This is the global variable space
 type Global struct {
+	Module *Module
 	name          string
 	IsInitialized bool
 	Class         *ClassVar
@@ -79,6 +64,7 @@ var GlobalVars = make([]Global, 65000)
 var GlobalCount = int16(0)
 
 type Local struct {
+	Module *Module
 	name          string
 	depth         int
 	isCaptured    bool

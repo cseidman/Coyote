@@ -300,6 +300,7 @@ const (
 	TOKEN_SQL_WITHOUT
 	TOKEN_MODULE
 	TOKEN_IMPORT
+	TOKEN_DOUBLE_COLON
 )
 
 type TokenProperties struct {
@@ -425,6 +426,7 @@ var TokenLabels = map[string]TokenProperties{
 	"%>":      {TOKEN_END_VAR, false},
 	"module":      {TOKEN_MODULE, true},
 	"import":      {TOKEN_IMPORT, true},
+	"::":		   {TOKEN_DOUBLE_COLON, true},
 }
 var SqlTokenLabels = map[string]TokenProperties{
 	// SQL Commnads

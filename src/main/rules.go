@@ -292,6 +292,7 @@ func (c *Compiler) LoadRules() {
 		{nil, nil, nil, PREC_NONE}, //TOKEN_SQL_WINDOW
 		{nil, nil, nil, PREC_NONE}, //TOKEN_SQL_WITH
 		{nil, nil, nil, PREC_NONE}, //TOKEN_SQL_WITHOUT
+		{nil, nil, nil, PREC_NONE}, //TOKEN_DOUBLE_COLON
 
 
 	}
