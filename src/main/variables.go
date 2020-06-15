@@ -50,7 +50,7 @@ func (v *PropertyVar) GetScopeType() VariableScope {
 
 // This is the global variable space
 type Global struct {
-	Module *Module
+	Module *ObjModule
 	name          string
 	IsInitialized bool
 	Class         *ClassVar
@@ -64,7 +64,7 @@ var GlobalVars = make([]Global, 65000)
 var GlobalCount = int16(0)
 
 type Local struct {
-	Module *Module
+	Module *ObjModule
 	name          string
 	depth         int
 	isCaptured    bool

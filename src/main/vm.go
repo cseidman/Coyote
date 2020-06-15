@@ -250,8 +250,9 @@ func Exec(source *string, dbgMode bool) {
 	vm.db = OpenDb(":memory:")
 	vm.DbList["main"] = vm.db
 
-	fn := Compile(source, dbgMode)
-
+	//fn := Compile(source, dbgMode)
+	mod := Compile(source, dbgMode)
+	fn := mod.MainFunction
 	if fn == nil {
 		fmt.Println("Syntax error")
 		return

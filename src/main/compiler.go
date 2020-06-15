@@ -138,14 +138,6 @@ func (f *FunctionVar) ConvertToObj() *ObjFunction {
 	}
 }
 
-type Module struct {
-	ParentModule *Module
-	Name string
-	LoadedModules []*Module
-	ModuleCount int
-	IsUsed bool // Is it used anywhere?
-}
-
 type Compiler struct {
 	Current *FunctionVar
 
@@ -157,21 +149,40 @@ type Compiler struct {
 
 	MainModuleDefined bool
 
-	Modules []Module
+	Modules []ObjModule
 	ModuleCount int
-	CurrentModule *Module
+	CurrentModule *ObjModule
+
 }
 
-func Compile(source *string, dbgMode bool) *ObjFunction {
+func (c *Compiler) CompileModule(path string, dbgMode bool) *ObjModule{
+	source := ReadFile(path) + "\n"
+	return Compile(&source, dbgMode)
+
+}
+
+func Compile(source *string, dbgMode bool) *ObjModule {
+
+	module := ObjModule{
+		ParentModule:  nil,
+		Name:          "",
+		IsUsed:        false,
+		LoadedModules: nil,
+		ModuleCount:   0,
+		ModuleId:      nil,
+		MainFunction:  nil,
+	}
 
 	// First parse the source
 	parser := NewParser(source)
 
 	compiler := NewCompiler(&parser)
 	compiler.DebugMode = dbgMode
-
 	// Global function store
 	RegisterFunctions()
+
+	compiler.CurrentModule = &module
+	compiler.CurrentModule.Name = ""
 
 	compiler.Advance()
 	for !compiler.Match(TOKEN_EOF) {
@@ -194,7 +205,9 @@ func Compile(source *string, dbgMode bool) *ObjFunction {
 	if compiler.Parser.HadError {
 		return nil
 	}
-	return fn
+
+	compiler.CurrentModule.MainFunction = fn
+	return compiler.CurrentModule
 }
 
 /* -------------------------------------------------------
@@ -213,7 +226,7 @@ func NewCompiler(parser *Parser) *Compiler {
 
 func (c *Compiler) Init() {
 
-	c.Modules = make([]Module, 16556)
+	c.Modules = make([]ObjModule, 16556)
 
 	c.Current = &FunctionVar{
 		paramCount: 0,
@@ -285,18 +298,6 @@ func (c *Compiler) Advance() {
 	c.Parser.Prev2 = c.Parser.Previous
 	c.Parser.Previous = c.Parser.Current
 	c.Parser.Current = c.Parser.NextToken()
-}
-
-func (c *Compiler) ResolveModule(moduleName string) int {
-	// Checks to see if this module had been registered
-	for i:=0;i<c.ModuleCount-1;i++ {
-		// We already have this module
-		if c.Modules[i].Name == moduleName && c.Modules[i].ParentModule.Name == c.CurrentModule.Name {
-			c.CurrentModule = &c.Modules[i]
-			return i
-		}
-	}
-	return -1
 }
 
 func (c *Compiler) ResolveGlobal(tok *Token) (int16, *ExpressionData) {
@@ -2253,55 +2254,6 @@ func (c *Compiler) Procedure(functionType FunctionType) {
 
 func (c *Compiler) Allocate() {
 	c.New(true)
-}
-
-func (c *Compiler) RegisterModule(moduleName string) {
-
-	idx := c.ResolveModule(moduleName)
-	// If we found an existing module
-	if idx > -1 {
-		return
-	}
-
-	mod := Module{
-		ParentModule: c.CurrentModule,
-		Name:         moduleName,
-		IsUsed:       false,
-	}
-
-	c.Modules[c.ModuleCount] = mod
-	c.CurrentModule = &mod
-	c.ModuleCount++
-}
-
-func (c *Compiler) DeclareModule() {
-	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'module'")
-	moduleName := c.Parser.Previous.ToString()
-
-	c.RegisterModule(moduleName)
-}
-
-func (c *Compiler) ImportStatement() {
-	// import <modulename> [as <alias>]
-	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'import'")
-	moduleName := c.Parser.Previous.ToString()
-
-	// See if this module has already been imported
-	for i:=0;i<c.CurrentModule.ModuleCount;i++ {
-		if c.CurrentModule.LoadedModules[i].Name == moduleName {
-			// If so, then there's no point in importing it again
-			return
-		}
-	}
-
-	idx := c.ResolveModule(moduleName)
-	if idx == -1 {
-		c.Error(fmt.Sprintf("Module %s not found",moduleName))
-	}
-	c.CurrentModule.LoadedModules[c.CurrentModule.ModuleCount] = &c.Modules[idx]
-	c.EmitInstr(OP_IMPORT, int16(idx))
-	c.WriteComment(fmt.Sprintf("Import module %s",moduleName))
-
 }
 
 func (c *Compiler) Statement() {
