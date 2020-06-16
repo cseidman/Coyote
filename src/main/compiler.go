@@ -167,7 +167,7 @@ func Compile(source *string, dbgMode bool) *ObjModule {
 		ParentModule:  nil,
 		Name:          "",
 		IsUsed:        false,
-		LoadedModules: nil,
+		LoadedModules: make([]ObjModule,1024),
 		ModuleCount:   0,
 		ModuleId:      nil,
 		MainFunction:  nil,
@@ -181,18 +181,11 @@ func Compile(source *string, dbgMode bool) *ObjModule {
 	// Global function store
 	RegisterFunctions()
 
-	compiler.CurrentModule = &module
-	compiler.CurrentModule.Name = ""
+	module.Name = "main"
 
 	compiler.Advance()
 	for !compiler.Match(TOKEN_EOF) {
 		compiler.Evaluate()
-	}
-
-	compiler.EmitOp(OP_HALT)
-	if dbgMode {
-		fmt.Println("=== Instructions ===")
-		compiler.CurrentInstructions().Display()
 	}
 
 	fn := &ObjFunction{
@@ -205,9 +198,19 @@ func Compile(source *string, dbgMode bool) *ObjModule {
 	if compiler.Parser.HadError {
 		return nil
 	}
+	compiler.CurrentModule = &module
+	module.MainFunction = fn
+	compiler.Modules[compiler.ModuleCount] = module
+	compiler.CurrentModule.LoadedModules[compiler.CurrentModule.ModuleCount] = module
+	compiler.ModuleCount++
 
-	compiler.CurrentModule.MainFunction = fn
-	return compiler.CurrentModule
+	//compiler.EmitOp(OP_HALT)
+	if dbgMode {
+		fmt.Println("=== Instructions ===")
+		compiler.CurrentInstructions().Display()
+	}
+
+	return &module
 }
 
 /* -------------------------------------------------------
@@ -228,6 +231,12 @@ func (c *Compiler) Init() {
 
 	c.Modules = make([]ObjModule, 16556)
 
+	curMod := c.Modules[0]
+	curMod.LoadedModules = make([]ObjModule,1024)
+	c.ModuleCount++
+
+	c.CurrentModule = &curMod
+
 	c.Current = &FunctionVar{
 		paramCount: 0,
 		Enclosing:  nil,
@@ -237,6 +246,7 @@ func (c *Compiler) Init() {
 		Upvalues:   make([]Upvalue, 65000),
 		LocalCount: 0,
 	}
+
 
 	c.ScopeDepth = 0
 

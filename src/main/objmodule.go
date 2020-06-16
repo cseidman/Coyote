@@ -19,7 +19,7 @@ type ObjModule struct {
 	ParentModule *ObjModule
 	Name string
 	IsUsed bool // Is it used anywhere?
-	LoadedModules []*ObjModule // The modules that this module loads
+	LoadedModules []ObjModule // The modules that this module loads
 	ModuleCount int // How many loaded modules we have
 	ModuleId []byte // This is an id value that contains information starting from the parent
 	MainFunction *ObjFunction // Starting function in the module
@@ -29,23 +29,22 @@ var moduleSequence = int16(0)
 
 func (c *Compiler) ImportStatement() {
 	// import <modulepath>
-	c.Consume(TOKEN_IDENTIFIER,"Expect module name after 'import'")
-	moduleName := c.Parser.Previous.ToString()
-	for {
-		if !c.Match(TOKEN_SLASH) {
-			break
-		}
-	}
+	c.Consume(TOKEN_STRING,"Expect module path after 'import'")
+	strVar := c.Parser.Previous.ToString()
+	moduleName := strVar[1:len(strVar)-1]
 
 	var moduleObj *ObjModule
 
+	// See if this module already has been loaded
 	idx := c.ResolveModule(moduleName)
-	if idx != -1 {
+	// If not .. load it
+	if idx == -1 {
 		moduleObj = c.CompileModule(moduleName, false)
-		
+		c.Modules[c.ModuleCount] = *moduleObj
+		idx = c.ModuleCount
+		c.ModuleCount++
 	}
 
-	c.CurrentModule.LoadedModules[c.CurrentModule.ModuleCount] = &c.Modules[idx]
 	c.EmitInstr(OP_IMPORT, int16(idx))
 	c.WriteComment(fmt.Sprintf("Import module %s",moduleName))
 
@@ -53,7 +52,7 @@ func (c *Compiler) ImportStatement() {
 
 func (c *Compiler) ResolveModule(moduleName string) int {
 
-	curMod := c.CurrentModule
+	//curMod := c.CurrentModule
 	modName := moduleName
 
 	// Checks to see if this module had been registered
@@ -88,18 +87,18 @@ func (c *Compiler) RegisterModule(moduleName string) int {
 	// That makes it possible to differentiate "file.csv.open" from "stream.csv.open" because
 	// The two references could have Id values (ex:) 010203 vs 040506
 	// Note: This is relevant only when we get to nested modules
-	modId := append(c.CurrentModule.ModuleId,Int16ToBytes(moduleSequence)...)
+	//modId := append(c.CurrentModule.ModuleId,Int16ToBytes(moduleSequence)...)
 	moduleSequence++
 
-	mod := ObjModule{
+	mod := &ObjModule{
 		ParentModule: c.CurrentModule,
 		Name:         moduleName,
 		IsUsed:       false,
-		ModuleId: 	  modId,
+		ModuleId: 	  nil,
 	}
 
-	c.Modules[c.ModuleCount] = mod
-	c.CurrentModule = &mod
+	c.Modules[c.ModuleCount] = *mod
+	c.CurrentModule = mod
 	c.ModuleCount++
 	return c.ModuleCount-1
 }

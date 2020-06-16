@@ -1,9 +1,8 @@
 module main
 
-import utils
+import "../tests/uilts.cy"
 
 var x = 100
-var y = utils::doubleit(x)
+var y = doubleit(x)
 println(y)
-
 

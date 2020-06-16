@@ -280,10 +280,15 @@ func (v *VM) Interpret() {
 	if v.DebugMode {
 		fmt.Println("=== VM Run ===")
 	}
-
+	codeLen := len(v.Code)
 	var opCode byte
 	for {
 		v.Frame.ip++
+		if codeLen == v.Frame.ip {
+			fmt.Println("Completed")
+			break
+		}
+
 		opCode = v.Code[v.Frame.ip]
 		if opCode == OP_HALT {
 			fmt.Println("Completed")
@@ -956,6 +961,10 @@ func (v *VM) Dispatch(opCode byte) {
 	case OP_DISPLAY_TABLE:
 		df := v.Pop().(*ObjDataFrame)
 		df.PrintData(0)
+
+	case OP_IMPORT:
+		idx := v.GetOperandValue()
+		fmt.Println(idx)
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
