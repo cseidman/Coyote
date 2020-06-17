@@ -1,8 +1,8 @@
 module main
 
-import "../tests/uilts.cy"
+import "../tests/utils.cy" as utils
 
-var x = 100
-var y = doubleit(x)
-println(y)
-
+var x = 15
+var y = 16
+var z = sum(x,y)
+println(z)

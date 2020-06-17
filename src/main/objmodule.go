@@ -30,17 +30,28 @@ var moduleSequence = int16(0)
 func (c *Compiler) ImportStatement() {
 	// import <modulepath>
 	c.Consume(TOKEN_STRING,"Expect module path after 'import'")
-	strVar := c.Parser.Previous.ToString()
-	moduleName := strVar[1:len(strVar)-1]
+	modulePath := c.Parser.Previous.ToString()
 
+	c.Consume(TOKEN_AS,"Expect 'AS after 'import <path>'")
+	c.Consume(TOKEN_IDENTIFIER,"Expect module alias after 'import <path> AS'")
+
+	// This is the friendly name of the import which we then use as a
+	// reference to module scoped objects
+	moduleName := c.Parser.Previous.ToString()
+
+	// This is going to be where we build the module
 	var moduleObj *ObjModule
 
-	// See if this module already has been loaded
-	idx := c.ResolveModule(moduleName)
-	// If not .. load it
+	// See if this module already has been loaded by another module
+	idx := c.ResolveModule(modulePath)
+
+	// If not .. compile and load it
 	if idx == -1 {
-		moduleObj = c.CompileModule(moduleName, false)
+		// Compile the file with the module and fill the module variable with code
+		moduleObj = c.CompileModule(modulePath, false)
+		// Add this module to the loaded modules
 		c.Modules[c.ModuleCount] = *moduleObj
+		
 		idx = c.ModuleCount
 		c.ModuleCount++
 	}

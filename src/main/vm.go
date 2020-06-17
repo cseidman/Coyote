@@ -964,7 +964,7 @@ func (v *VM) Dispatch(opCode byte) {
 
 	case OP_IMPORT:
 		idx := v.GetOperandValue()
-		fmt.Println(idx)
+
 
 	default:
 		fmt.Printf("Unhandled command: %s\n", OpLabel[(*v.GetByteCode())[v.Frame.ip]])
